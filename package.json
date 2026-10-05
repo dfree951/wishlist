@@ -1,0 +1,35 @@
+{
+  "name": "syd-and-dan-christmas",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --hostname 0.0.0.0",
+    "build": "next build",
+    "build:pages": "node scripts/build-pages.mjs",
+    "start": "next start --hostname 0.0.0.0",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test tests/*.test.ts",
+    "db:migrate": "node --env-file=.env.local scripts/migrate.mjs",
+    "test:integration": "node --env-file=.env.local scripts/integration.mjs"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "latest",
+    "@vercel/blob": "^2.8.0",
+    "cheerio": "latest",
+    "ipaddr.js": "latest",
+    "lucide-react": "latest",
+    "next": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "sharp": "^0.35.5",
+    "undici": "latest",
+    "zod": "latest"
+  },
+  "devDependencies": {
+    "@types/node": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "tsx": "latest",
+    "typescript": "latest"
+  }
+}

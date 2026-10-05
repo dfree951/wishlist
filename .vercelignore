@@ -1,0 +1,10 @@
+# Upload only the files needed to build and run the backend.
+*
+!src
+!src/**
+!package.json
+!package-lock.json
+!next.config.ts
+!next-env.d.ts
+!tsconfig.json
+!vercel.json
