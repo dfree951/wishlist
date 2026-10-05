@@ -24,7 +24,7 @@ function ItemRow({ item, manage, busy, showOwner, onPurchase, onEdit, onDelete }
   const href=best?.url||item.url;
   return <article className={`item-row${item.purchased&&!manage?' is-purchased':''}`}>
     <ProductImage src={item.image} name={item.name}/>
-    <div className="item-content"><div className="item-overline">{showOwner&&<span className={`owner-label ${item.owner.toLowerCase()}`}>{item.owner}</span>}<span className="store-label">{storeName(item.url)}</span></div>
+    <div className="item-content"><div className="item-overline">{showOwner&&item.owner!=='Both'&&<span className={`owner-label ${item.owner.toLowerCase()}`}>{item.owner}</span>}<span className="store-label">{storeName(item.url)}</span></div>
       <h3><a href={item.url} target="_blank" rel="noreferrer">{item.name}</a></h3>
       <div className="item-facts"><span className="price">{money(item.price,item.currency)}</span>{item.size&&<span className="size">{item.size}</span>}{item.packCount!=null&&item.packCount>1&&<span className="size">{item.packCount} pack</span>}{item.preference&&<span className="size">{preferenceLabels[item.preference]}</span>}</div>
       {item.notes&&<p className="item-notes">{item.notes}</p>}
