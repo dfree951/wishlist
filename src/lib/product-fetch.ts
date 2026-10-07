@@ -33,8 +33,11 @@ const dispatcher = new Agent({ connect: { lookup(hostname, options, callback) {
   });
 } } });
 
-function safeImage(value: unknown, base: string): string {
-  if (Array.isArray(value)) return safeImage(value[0], base);
+export function safeImage(value: unknown, base: string): string {
+  if (Array.isArray(value)) {
+    for (const candidate of value) { const image = safeImage(candidate, base); if (image) return image; }
+    return '';
+  }
   if (value && typeof value === 'object') return safeImage((value as Record<string, unknown>).url || (value as Record<string, unknown>).contentUrl, base);
   if (typeof value !== 'string' || !value.trim()) return '';
   try { return validateFetchUrl(new URL(value, base).href).href; } catch { return ''; }
@@ -91,10 +94,23 @@ export function parseProductHtml(html: string, url: string): ProductDetails {
     : /amazon\.in$/.test(new URL(url).hostname) ? 'INR' : 'USD';
   const meta = (key: string) => $(`meta[property="${key}"], meta[name="${key}"]`).first().attr('content')?.trim() || '';
   const roots: unknown[] = [];
-  $('script[type="application/ld+json"]').each((_, element) => {
+  $('script[type="application/ld+json"], script[type="application/json"]').each((_, element) => {
     try { roots.push(JSON.parse($(element).text())); } catch { /* Some stores emit invalid JSON-LD. */ }
   });
   const { product, offer, variants } = structuredProduct(roots, url, $('link[rel="canonical"]').attr('href'));
+  // Read microdata only inside the selected product, never recommendation cards.
+  const scopes = $('[itemscope][itemtype*="schema.org/Product"]').filter((_, element) => {
+    const itemid = $(element).attr('itemid');
+    if (!itemid) return false;
+    try { return cleanProductUrl(new URL(itemid, url).href) === cleanProductUrl(url); } catch { return false; }
+  });
+  const allScopes = $('[itemscope][itemtype*="schema.org/Product"]');
+  const scope = scopes.length === 1 ? scopes.first() : allScopes.length === 1 && !allScopes.attr('itemid') ? allScopes.first() : $();
+  const field = (key: string) => {
+    const element = scope.find(`[itemprop="${key}"]`).filter((_, candidate) =>
+      $(candidate).closest('[itemscope][itemtype*="schema.org/Product"]')[0] === scope[0]).first();
+    return element.attr('content') || element.attr('href') || element.attr('src') || element.text().trim();
+  };
   let storePrice = '', storeImage = '', storeName = '';
   if (/(^|\.)apple\.com$/.test(hostname) && new URL(url).pathname.startsWith('/shop/')) {
     storeName = $('h1').first().text().trim().replace(/^Buy\s+/, '');
@@ -109,15 +125,15 @@ export function parseProductHtml(html: string, url: string): ProductDetails {
   }
   const priceSpec = offer.priceSpecification as Record<string, unknown> | undefined;
   // Generic metadata can contain the cheapest variant, not the one in the URL.
-  const rawPrice = amazonPrice || storePrice || (offer.price ?? priceSpec?.price ?? (!variants && (meta('product:price:amount') || meta('og:price:amount') || (!amazon && $('[itemprop="price"]').first().attr('content')))));
+  const rawPrice = amazonPrice || storePrice || (offer.price ?? priceSpec?.price ?? (!variants && (meta('product:price:amount') || meta('og:price:amount') || (!amazon && field('price')))));
   const parsedPrice = parsePrice(rawPrice);
-  const rawName = (amazon && firstText(['#productTitle', '#title'])) || storeName || (typeof product.name === 'string' ? product.name : meta('og:title') || pageTitle);
+  const rawName = (amazon && firstText(['#productTitle', '#title'])) || storeName || (typeof product.name === 'string' ? product.name : field('name') || meta('og:title') || meta('twitter:title') || firstText(['main h1', 'h1']) || pageTitle);
   const name = normalizeName(rawName).slice(0, 200);
-  const currency = String(amazonPrice ? amazonCurrency : offer.priceCurrency || priceSpec?.priceCurrency || meta('product:price:currency') || meta('og:price:currency') || (amazon ? amazonCurrency : 'USD')).toUpperCase();
+  const currency = String(amazonPrice ? amazonCurrency : offer.priceCurrency || priceSpec?.priceCurrency || field('priceCurrency') || meta('product:price:currency') || meta('og:price:currency') || (amazon ? amazonCurrency : 'USD')).toUpperCase();
   const price = currency === 'USD' ? parsedPrice : null;
   const scalar = (value: unknown) => typeof value === 'string' || typeof value === 'number' ? String(value) : '';
   const measurements = productMeasurements(rawName);
-  const size = amazonSize || [...new Set([scalar(product.size) || (measurements.length === 1 ? measurements[0] : ''), scalar(product.color || product.Color)].filter(Boolean))].join(', ');
+  const size = amazonSize || [...new Set([scalar(product.size) || field('size') || (measurements.length === 1 ? measurements[0] : ''), scalar(product.color || product.Color) || field('color')].filter(Boolean))].join(', ');
   const selectedPack = amazon ? firstText([
     '#inline-twister-expanded-dimension-text-number_of_items',
     '#variation_number_of_items .selection',
@@ -140,7 +156,7 @@ export function parseProductHtml(html: string, url: string): ProductDetails {
       if (isPackProperty(label)) packCount = packQuantity(value) ?? packCountFromText(value);
     });
   }
-  const image = safeImage(amazonImage?.attr('data-old-hires') || amazonImage?.attr('data-src') || amazonImage?.attr('src') || storeImage || product.image || (!variants && (meta('og:image') || meta('twitter:image'))), url);
+  const image = safeImage([amazonImage?.attr('data-old-hires'), amazonImage?.attr('data-src'), amazonImage?.attr('src'), storeImage, product.image, ...(!variants ? [field('image'), meta('og:image'), meta('twitter:image')] : [])], url);
   const parts = [];
   if (!name) parts.push('a name');
   if (!image) parts.push('an image');
@@ -149,7 +165,7 @@ export function parseProductHtml(html: string, url: string): ProductDetails {
     checkedAt: price === null ? null : new Date().toISOString(),
     ...(parts.length ? { warning: currency !== 'USD' ? 'The store lists a non-USD price. Enter the USD price below.' : `Couldn’t read ${parts.join(' or ')} from this page. You can enter it below.` } : {}) };
 }
-type HtmlReadOptions = { allowPartial?: boolean; enough?: (html: string) => boolean };
+type HtmlReadOptions = { allowPartial?: boolean; enough?: (html: string) => boolean; timeoutMs?: number };
 
 export async function readHtml(reader: ReadableStreamDefaultReader<Uint8Array>, options: HtmlReadOptions = {}): Promise<string> {
   const chunks: Uint8Array[] = [];
@@ -189,7 +205,7 @@ type PageReadOptions = Omit<HtmlReadOptions, 'enough'> & { enough?: (html: strin
 
 async function fetchPage(value: string, options: PageReadOptions = {}, request: typeof fetch = fetch): Promise<{ html: string; url: string }> {
   let url = validateFetchUrl(value);
-  const signal = AbortSignal.timeout(10000);
+  const signal = AbortSignal.timeout(options.timeoutMs ?? 10000);
   for (let redirects = 0; redirects < 5; redirects++) {
     let response;
     try {

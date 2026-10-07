@@ -5,6 +5,23 @@ import { fetchProduct, parseProductHtml } from '../src/lib/product-fetch';
 import { itemSchema, storeName } from '../src/lib/items';
 
 const schema = (data: unknown) => `<script type="application/ld+json">${JSON.stringify(data)}</script>`;
+
+test('embedded JSON, alternate image candidates, and scoped microdata recover missing fields', () => {
+  const url = 'https://www.crateandbarrel.com/camille-23-oz.-long-stem-red-wine-glass/s544517';
+  const html = '<script type="application/json">' + JSON.stringify({ page: { '@type': 'Product', name: 'Camille 23-Oz. Long-Stem Red Wine Glass', image: ['data:invalid', '/red.jpg'], offers: { price: 14.95, priceCurrency: 'USD' } } }) + '</script>';
+  const embedded = parseProductHtml(html, url);
+  assert.equal(embedded.price, 14.95); assert.equal(embedded.size, '23 Oz');
+  assert.equal(embedded.image, 'https://www.crateandbarrel.com/red.jpg');
+  const microdata = '<div itemscope itemtype="https://schema.org/Product" itemid="' + url + '"><h1 itemprop="name">Camille 23-Oz. Glass</h1><span itemprop="price">$14.95</span><meta itemprop="priceCurrency" content="USD"><img itemprop="image" src="/red.jpg"></div><div itemscope itemtype="https://schema.org/Product" itemid="https://www.crateandbarrel.com/other/s1"><span itemprop="price">$1.00</span></div>';
+  assert.equal(parseProductHtml(microdata, url).price, 14.95);
+  assert.equal(parseProductHtml(microdata, url).image, 'https://www.crateandbarrel.com/red.jpg');
+  assert.equal(parseProductHtml(microdata.replace('content="USD"', 'content="CAD"'), url).price, null);
+});
+
+test('an invalid schema image falls back to usable metadata without selecting a different variant', () => {
+  const html = '<meta property="og:image" content="/valid.jpg">' + schema({ '@type': 'Product', name: 'Glass', image: 'http://127.0.0.1/private.jpg' });
+  assert.equal(parseProductHtml(html, 'https://example.com/glass').image, 'https://example.com/valid.jpg');
+});
 const stanley = 'https://www.stanley1913.com/products/tumbler';
 const variants = {
   '@type': 'ProductGroup', name: 'Tumbler | 40 OZ', url: stanley,

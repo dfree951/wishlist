@@ -1,5 +1,5 @@
 import { load } from 'cheerio';
-import { fetchHtml, validateFetchUrl } from './product-fetch';
+import { fetchHtml, safeImage, validateFetchUrl } from './product-fetch';
 import type { ProductMatch } from './items';
 
 export type SearchInput = { name: string; size?: string; notes?: string };
@@ -24,8 +24,36 @@ export function parseSearchEntries(html: string): ProductMatch[] {
       url.hash = '';
       if (seen.has(url.href)) return;
       seen.add(url.href);
-      matches.push({ name: title, url: url.href, snippet });
+      const thumbnail = row.find('img.result__image, .result__image img, .result__image').filter('img').first();
+      const image = safeImage(thumbnail.attr('data-src') || thumbnail.attr('src'), url.href);
+      matches.push({ name: title, url: url.href, snippet, ...(image ? { image } : {}) });
     } catch { /* Ignore malformed, non-web, or private destination links. */ }
+  });
+  return matches.slice(0, 15);
+}
+
+export function parseBingEntries(html: string): ProductMatch[] {
+  const $ = load(html);
+  const matches: ProductMatch[] = [];
+  const seen = new Set<string>();
+  $('.b_algo').each((_, element) => {
+    const row = $(element), anchor = row.find('h2 a').first();
+    const name = anchor.text().replace(/\s+/g, ' ').trim().slice(0, 250);
+    try {
+      let url = new URL(anchor.attr('href') || '', 'https://www.bing.com');
+      if (url.hostname === 'www.bing.com' && url.pathname === '/ck/a') {
+        const encoded = url.searchParams.get('u');
+        if (!encoded?.startsWith('a1')) return;
+        url = new URL(Buffer.from(encoded.slice(2), 'base64url').toString('utf8'));
+      }
+      url = validateFetchUrl(url.href);
+      if (!name || /(^|\.)bing\.com$/.test(url.hostname) || seen.has(url.href)) return;
+      seen.add(url.href);
+      // Site icons are not product photos. Accept only result thumbnails.
+      const image = row.find('.b_imagePair img, .b_thumb img').first();
+      const thumbnail = safeImage(image.attr('data-src') || image.attr('src'), url.href);
+      matches.push({ name, url: url.href, snippet: row.find('.b_caption p').text().replace(/\s+/g, ' ').trim().slice(0, 1000), ...(thumbnail ? { image: thumbnail } : {}) });
+    } catch { /* Ignore invalid and private search destinations. */ }
   });
   return matches.slice(0, 15);
 }
@@ -56,11 +84,15 @@ export async function searchEntries(query: string): Promise<ProductMatch[]> {
   const cached = cache.get(query);
   if (cached && cached.expires > Date.now()) return cached.matches;
   const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}&kl=us-en`;
-  const html = await fetchHtml(url);
-  if (/anomaly\.js|bots use DuckDuckGo|challenge-form|anomaly-modal/i.test(html)) {
-    throw new Error('Product search is temporarily unavailable. Try again or paste a product link.');
+  let matches: ProductMatch[] = [];
+  try {
+    const html = await fetchHtml(url, { timeoutMs: 6000 });
+    if (!/anomaly\.js|bots use DuckDuckGo|challenge-form|anomaly-modal/i.test(html)) matches = parseSearchEntries(html);
+  } catch { /* A second free public index may still be available. */ }
+  if (!matches.length) {
+    try { matches = parseBingEntries(await fetchHtml(`https://www.bing.com/search?q=${encodeURIComponent(query)}&setlang=en-US&cc=US`, { timeoutMs: 6000 })); }
+    catch { throw new Error('Product search is temporarily unavailable. Try again or paste a product link.'); }
   }
-  const matches = parseSearchEntries(html);
   if (matches.length) {
     if (cache.size >= 100) cache.delete(cache.keys().next().value!);
     cache.set(query, { expires: Date.now() + 15 * 60_000, matches });

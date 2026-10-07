@@ -49,7 +49,7 @@ export function matchesRecipient(recipient: Recipient, filter: Recipient) {
 export type BuyingOption = z.infer<typeof optionSchema>;
 export type Item = ItemData & { id: string; version: number; purchased?: boolean; purchasedAt?: string | null };
 export type ProductDetails = Pick<ItemData, 'name'|'url'|'image'|'price'|'currency'|'size'|'packCount'|'checkedAt'> & { warning?: string };
-export type ProductMatch = { name: string; url: string; snippet: string };
+export type ProductMatch = { name: string; url: string; snippet: string; image?: string };
 export function money(price: number | null, currency = 'USD') {
   if (price === null) return 'Price not listed';
   try { return new Intl.NumberFormat('en-US', { style: 'currency', currency, maximumFractionDigits: 2 }).format(price); }

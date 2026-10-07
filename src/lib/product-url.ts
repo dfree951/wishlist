@@ -7,7 +7,7 @@ export function cleanProductUrl(value: string): string {
   const crate = /^(?:www\.)?(?:crateandbarrel|cb2)\.com$/.test(url.hostname);
   const sku = crate ? url.pathname.match(/\/s(\d+)\/?$/)?.[1] : undefined;
   for (const key of new Set(url.searchParams.keys())) {
-    const crateAd = crate && ['a', 'pcat', 'ag'].includes(key.toLowerCase());
+    const crateAd = crate && ['a', 'pcat', 'ag', 'st'].includes(key.toLowerCase());
     const sameSku = crate && key.toLowerCase() === 'pla_sku' && url.searchParams.getAll(key).every(value => value === sku);
     const emptyStore = crate && key.toLowerCase() === 'storeid' && url.searchParams.getAll(key).every(value => !value);
     if (advertising.test(key) || crateAd || sameSku || emptyStore) url.searchParams.delete(key);

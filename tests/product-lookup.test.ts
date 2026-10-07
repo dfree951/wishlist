@@ -63,9 +63,30 @@ test('complete direct product details skip search and partial results retain aut
   assert.equal(recovered.name, complete.name); assert.equal(recovered.image, complete.image); assert.equal(recovered.size, complete.size);
 });
 
-test('a selected name-search result can be reused without a second search request', async () => {
-  const product = await lookupProduct(url, '', { direct: blocked, cached: () => [match], search: async () => { assert.fail('Unnecessary second search'); } });
+test('a complete cached match can be reused without a second search request', async () => {
+  const product = await lookupProduct(url, '', { direct: blocked, cached: () => [{ ...match, snippet: 'Price: $35.00', image: 'https://example.com/cup.jpg' }], search: async () => { assert.fail('Unnecessary second search'); } });
   assert.equal(product.size, '40oz');
+});
+
+test('partial cached matches and separate searches fill missing fields without overwriting direct values', async () => {
+  let searches = 0;
+  const product = await lookupProduct(url, '', {
+    direct: async () => ({ name: 'Direct name', url, image: '', price: null, currency: 'USD', size: '', packCount: null, checkedAt: null }),
+    cached: () => [match],
+    search: async () => ++searches === 1 ? [{ ...match, snippet: 'Price: $35.00' }] : [{ ...match, image: 'https://example.com/cup.jpg' }],
+  });
+  assert.equal(searches, 2); assert.equal(product.price, 35);
+  assert.equal(product.image, 'https://example.com/cup.jpg'); assert.equal(product.name, 'Direct name');
+  assert.equal(product.checkedAt, null);
+});
+
+test('an unavailable first search does not prevent the exact-ID search', async () => {
+  let attempts = 0;
+  const product = await lookupProduct(url, 'Stanley Quencher', { direct: blocked, search: async () => {
+    if (++attempts === 1) throw new Error('Temporary failure');
+    return [match];
+  } });
+  assert.equal(attempts, 2); assert.ok(product.name);
 });
 
 test('lookup failures remain honest, reject unsafe URLs, and bound search attempts', async () => {

@@ -1,5 +1,5 @@
 import { normalizeName, type ProductDetails, type ProductMatch } from './items';
-import { fetchProduct, parsePrice, validateFetchUrl } from './product-fetch';
+import { fetchProduct, parsePrice, safeImage, validateFetchUrl } from './product-fetch';
 import { packCountFromText, withoutPackSize } from './product-pack';
 import { cachedSearchEntries, searchEntries } from './product-search';
 import { cleanProductUrl, productMeasurements } from './product-url';
@@ -56,7 +56,7 @@ function indexedPrice(text: string, url: string): number | null {
   const label = text.match(/\b(?:(?:current|sale)\s+)?price\s*:?\s*(?:USD\s*)?\$\s*([\d,]+(?:\.\d{2})?)(?!\d|[,.]\d|\.\.)/i);
   if (!label) return null;
   const parsed = new URL(url);
-  const usdStore = ['walmart.com', 'target.com', 'amazon.com', 'bestbuy.com', 'rei.com'].includes(host(parsed));
+  const usdStore = ['walmart.com', 'target.com', 'amazon.com', 'bestbuy.com', 'rei.com', 'crateandbarrel.com', 'cb2.com'].includes(host(parsed));
   if (!/\bUSD\b/i.test(text) && !usdStore) return null;
   return parsePrice(label[1]);
 }
@@ -79,7 +79,7 @@ export function indexedDetails(match: ProductMatch, url: string): ProductDetails
     measurements = productMeasurements(new URL(match.url).pathname);
   }
   return {
-    name, url, image: '', currency: 'USD', price: indexedPrice(match.snippet, url),
+    name, url, image: safeImage(match.image, match.url), currency: 'USD', price: indexedPrice(match.snippet, url),
     size: measurements.length === 1 ? withoutPackSize(measurements[0]) : '',
     packCount: packCountFromText(name), checkedAt: null,
     warning: 'Details found in search results. Check them before saving.',
@@ -98,32 +98,47 @@ export async function lookupProduct(url: string, name = '', dependencies: Lookup
   try { direct = await dependencies.direct(url); } catch { /* Try the public search index next. */ }
   if (direct?.name && direct.image && direct.price !== null) return direct;
   const destination = direct?.url || url;
+  let best = direct;
+  const complete = (product: ProductDetails | undefined) => Boolean(product?.name && product.image && product.price !== null);
   function recover(matches: ProductMatch[]) {
     for (const match of matches) {
       const indexed = indexedDetails(match, destination);
       if (!indexed) continue;
-      if (!direct) return indexed;
-      const merged = { ...direct,
-        name: direct.name || indexed.name,
-        price: direct.price ?? indexed.price,
-        size: direct.size || indexed.size,
-        packCount: direct.packCount ?? indexed.packCount,
+      if (!best) { best = indexed; continue; }
+      const merged = { ...best,
+        name: best.name || indexed.name,
+        image: best.image || indexed.image,
+        price: best.price ?? indexed.price,
+        size: best.size || indexed.size,
+        packCount: best.packCount ?? indexed.packCount,
       };
-      if (merged.name !== direct.name || merged.price !== direct.price || merged.size !== direct.size || merged.packCount !== direct.packCount) {
-        return { ...merged, warning: indexed.warning, checkedAt: direct.price === null ? null : direct.checkedAt };
+      if (merged.name !== best.name || merged.image !== best.image || merged.price !== best.price || merged.size !== best.size || merged.packCount !== best.packCount) {
+        best = { ...merged, warning: indexed.warning, checkedAt: direct?.price == null ? null : direct.checkedAt };
       }
-      return direct;
     }
+    return best;
   }
   const cached = recover(dependencies.cached?.() || []);
-  if (cached) return cached;
+  if (complete(cached)) return cached!;
   for (const query of indexedQueries(destination, direct?.name || name)) {
     let matches: ProductMatch[];
-    try { matches = await dependencies.search(query); } catch { break; }
+    try { matches = await dependencies.search(query); } catch { continue; }
     const recovered = recover(matches);
-    if (recovered) return recovered;
+    if (complete(recovered)) return recovered!;
   }
-  if (direct) return direct;
+  if (best) return best;
+  // A descriptive retailer slug remains useful when both page and index block
+  // access. Label it as a link hint, never as verified store or pricing data.
+  const parsedUrl = new URL(url);
+  if (/^(?:crateandbarrel|cb2)\.com$/.test(host(parsedUrl)) && productId(parsedUrl)) {
+    const slug = parsedUrl.pathname.split('/').filter(Boolean).at(-2) || '';
+    if (/^[a-z0-9.-]+$/i.test(slug) && slug.split('-').length >= 4) {
+      const name = slug.replace(/-/g, ' ').replace(/\b\w/g, letter => letter.toUpperCase()).slice(0, 200);
+      const measurements = productMeasurements(name);
+      return { name, url, image: '', price: null, currency: 'USD', size: measurements.length === 1 ? measurements[0] : '', packCount: packCountFromText(name), checkedAt: null,
+        warning: 'The store blocked lookup. Name and size were read from the link; check them and add the price and image below.' };
+    }
+  }
   throw new Error(name.trim()
     ? 'Couldn’t fetch details automatically. Enter any missing details below.'
     : 'Couldn’t fetch details automatically. Add an item name and try again, or enter the details below.');

@@ -19,7 +19,7 @@ behind the API. Visitors stay on the GitHub Pages address while using the app.
 
 ## Stack and persistence
 
-**Cost constraint:** use free services only. Do not add paid APIs, metered search integrations, trials that convert to paid plans, or automatic credit top-ups. Product search uses public DuckDuckGo results without an account or API key; it can be incomplete or temporarily blocked. Successful results are cached in memory for 15 minutes to reduce repeat requests, separate from persistent wish list data.
+**Cost constraint:** use free services only. Do not add paid APIs, metered search integrations, trials that convert to paid plans, or automatic credit top-ups. Product search uses public DuckDuckGo results, with public Bing results as a fallback, without an account or API key; either can be incomplete or temporarily blocked. Successful results are cached in memory for 15 minutes to reduce repeat requests, separate from persistent wish list data. Lookup combines missing fields from matching indexed listings and accepts validated result thumbnails when available. Indexed prices remain unverified. If a Crate & Barrel or CB2 page and search are unavailable, descriptive links can supply name and size hints with an explicit warning; price and image remain editable.
 
 Next.js App Router, TypeScript, React, and Neon Postgres through Vercel Marketplace, on the Free database plan. Vercel project: `oracle951/syd-and-dan-christmas`. Neon resource: `dan-syd-christmas` in `iad1`.
 
