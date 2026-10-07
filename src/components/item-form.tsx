@@ -8,6 +8,9 @@ import { ProductSearch } from './product-search';
 import { mergeProductDetails, withProductUrl, type ProductFields } from '@/lib/product-editor';
 
 export const emptyItem = (owner: Recipient): ItemData => ({ owner, preference: null, name: '', url: '', image: '', imageSource: 'automatic', price: null, currency: 'USD', size: '', packCount: null, notes: '', checkedAt: null, alternatives: [] });
+function sourcingStatus(product: ProductDetails) {
+  return `Photo ${product.image ? 'sourced' : 'not sourced'}. Price ${product.price !== null ? 'sourced' : 'not sourced'}.`;
+}
 function ProductEditor({ value, onChange, prefix, disabled, onUploadBusyChange, notes = '' }: { value: ProductFields; onChange: (next: ProductFields) => void; prefix: string; disabled: boolean; onUploadBusyChange: (busy: boolean) => void; notes?: string }) {
   const [fetching, setFetching] = useState(false);
   const [feedback, setFeedback] = useState('');
@@ -36,7 +39,7 @@ function ProductEditor({ value, onChange, prefix, disabled, onUploadBusyChange, 
       const next = mergeProductDetails(valueRef.current, current, product);
       onChange(next);
       setPhotos({ key: JSON.stringify([next.name, next.size, next.url]), candidates: valueRef.current.name === current.name && valueRef.current.size === current.size ? product.imageCandidates || [] : [] });
-      setFeedback(product.warning || 'Details imported. Check the size and price before saving.');
+      setFeedback(sourcingStatus(product));
     } catch (e) { if (valueRef.current.url === requestedUrl) setFeedback(messageOf(e)); }
     finally { setFetching(false); }
   }
@@ -54,7 +57,7 @@ function ProductEditor({ value, onChange, prefix, disabled, onUploadBusyChange, 
       const next = mergeProductDetails(latest, current, { ...product, name: product.name || match.name }, true);
       onChange(next);
       setPhotos({ key: JSON.stringify([next.name, next.size, next.url]), candidates: latest.name === current.name && latest.size === current.size ? product.imageCandidates || [] : [] });
-      setFeedback(product.warning || 'Link and available details added.');
+      setFeedback(sourcingStatus(product));
     } catch {
       if (valueRef.current.url === match.url) setFeedback('Product link added. The store could not provide other details.');
     } finally { setFetching(false); }
@@ -66,7 +69,7 @@ function ProductEditor({ value, onChange, prefix, disabled, onUploadBusyChange, 
     </div>
     {feedback && <p className="form-notice" role="status">{feedback}</p>}
     <div className="field"><label htmlFor={`${prefix}-name`}>Item name <span className="required">*</span></label><input id={`${prefix}-name`} required maxLength={200} value={value.name} disabled={disabled} onChange={e=>patch({name:e.target.value})}/></div>
-    <ProductSearch name={value.name} size={[value.size, value.packCount ? `${value.packCount} pack` : ''].filter(Boolean).join(' ').slice(0,100)} notes={notes} disabled={disabled || fetching} onSelect={chooseMatch}/>
+    <ProductSearch name={value.name} size={value.size.slice(0,100)} notes={notes} disabled={disabled || fetching} onSelect={chooseMatch}/>
     <div className="field-grid two">
       <div className="field"><label htmlFor={`${prefix}-price`}>Price <span className="optional">(optional)</span></label><input id={`${prefix}-price`} type="number" min="0" max="1000000" step="0.01" value={value.price ?? ''} disabled={disabled} onChange={e=>patch({price:e.target.value === '' ? null : Number(e.target.value), checkedAt:null})}/></div>
       <div className="field"><label htmlFor={`${prefix}-size`}>Size / color <span className="optional">(optional)</span></label><input id={`${prefix}-size`} maxLength={100} value={value.size} disabled={disabled} onChange={e=>patch({size:e.target.value})}/></div>
