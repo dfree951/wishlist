@@ -12,7 +12,7 @@ assert.ok(token);
 const headers = { 'Content-Type': 'application/json', Origin: origin, Authorization: `Bearer ${token}` };
 const samples = [
   { name: 'Camille 23 Oz. Long Stem Red Wine Glass', size: '23 Oz', asset: /CamilleRedWine23oz/, url: 'https://www.crateandbarrel.com/camille-23-oz.-long-stem-red-wine-glass/s544517?st=Camille%2023-Oz.' },
-  { name: 'Camille 13 Oz. Long Stem White Wine Glass', size: '13 Oz', asset: /CamilleWhiteWine13oz/, url: 'https://www.crateandbarrel.com/camille-13-oz.-long-stem-white-wine-glass/s330817?a=1552&pla_sku=330817&storeid=' },
+  { name: 'Camille 13 Oz. Long Stem White Wine Glass', size: '13 Oz', asset: /Camille(?:WhiteWine13oz|_LongStemWineGlass_330817)/, url: 'https://www.crateandbarrel.com/camille-13-oz.-long-stem-white-wine-glass/s330817?a=1552&pla_sku=330817&storeid=' },
 ];
 for (const { asset, ...sample } of samples) {
   const response = await fetch(base + '/api/product', { method: 'POST', headers, body: JSON.stringify(sample), signal: AbortSignal.timeout(75000) });
