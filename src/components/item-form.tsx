@@ -2,7 +2,7 @@
 import { useRef, useState } from 'react';
 import { ArrowDownToLine, Plus, X } from 'lucide-react';
 import { api, messageOf } from '@/lib/client';
-import { itemSchema, preferenceLabels, type Item, type ItemData, type Recipient, type BuyingOption, type ProductDetails, type ProductMatch } from '@/lib/items';
+import { itemSchema, preferenceLabels, type Item, type ItemData, type Recipient, type BuyingOption, type ProductDetails, type ProductMatch, type ProductImageCandidate } from '@/lib/items';
 import { ImageInput } from './image-input';
 import { ProductSearch } from './product-search';
 import { mergeProductDetails, withProductUrl, type ProductFields } from '@/lib/product-editor';
@@ -11,6 +11,7 @@ export const emptyItem = (owner: Recipient): ItemData => ({ owner, preference: n
 function ProductEditor({ value, onChange, prefix, disabled, onUploadBusyChange, notes = '' }: { value: ProductFields; onChange: (next: ProductFields) => void; prefix: string; disabled: boolean; onUploadBusyChange: (busy: boolean) => void; notes?: string }) {
   const [fetching, setFetching] = useState(false);
   const [feedback, setFeedback] = useState('');
+  const [photos, setPhotos] = useState<{ key: string; candidates: ProductImageCandidate[] } | null>(null);
   const lastAuto = useRef(value.url);
   const detailsUrl = useRef(value.url);
   const valueRef = useRef(value); valueRef.current = value;
@@ -18,7 +19,7 @@ function ProductEditor({ value, onChange, prefix, disabled, onUploadBusyChange, 
   function changeUrl(url: string) {
     const next = withProductUrl(valueRef.current, url, detailsUrl.current);
     if (detailsUrl.current.trim() !== url.trim()) detailsUrl.current = '';
-    onChange(next); setFeedback('');
+    onChange(next); setFeedback(''); setPhotos(null);
   }
   async function lookup(automatic = false) {
     const current = valueRef.current;
@@ -30,9 +31,11 @@ function ProductEditor({ value, onChange, prefix, disabled, onUploadBusyChange, 
     detailsUrl.current = requestedUrl;
     setFetching(true); setFeedback('');
     try {
-      const { product } = await api<{product: ProductDetails}>('/api/product', { method: 'POST', body: JSON.stringify({ url: requestedUrl, name: current.name }) });
+      const { product } = await api<{product: ProductDetails}>('/api/product', { method: 'POST', body: JSON.stringify({ url: requestedUrl, name: current.name, size: current.size, findImage: current.imageSource !== 'manual' }) });
       if (valueRef.current.url !== requestedUrl) return;
-      onChange(mergeProductDetails(valueRef.current, current, product));
+      const next = mergeProductDetails(valueRef.current, current, product);
+      onChange(next);
+      setPhotos({ key: JSON.stringify([next.name, next.size, next.url]), candidates: valueRef.current.name === current.name && valueRef.current.size === current.size ? product.imageCandidates || [] : [] });
       setFeedback(product.warning || 'Details imported. Check the size and price before saving.');
     } catch (e) { if (valueRef.current.url === requestedUrl) setFeedback(messageOf(e)); }
     finally { setFetching(false); }
@@ -45,10 +48,12 @@ function ProductEditor({ value, onChange, prefix, disabled, onUploadBusyChange, 
     onChange(current);
     setFetching(true); setFeedback('');
     try {
-      const { product } = await api<{ product: ProductDetails }>('/api/product', { method: 'POST', body: JSON.stringify({ url: match.url, name: match.name.slice(0, 200) }) });
+      const { product } = await api<{ product: ProductDetails }>('/api/product', { method: 'POST', body: JSON.stringify({ url: match.url, name: match.name.slice(0, 200), size: current.size, findImage: current.imageSource !== 'manual' }) });
       const latest = valueRef.current;
       if (latest.url !== match.url) return;
-      onChange(mergeProductDetails(latest, current, { ...product, name: product.name || match.name }, true));
+      const next = mergeProductDetails(latest, current, { ...product, name: product.name || match.name }, true);
+      onChange(next);
+      setPhotos({ key: JSON.stringify([next.name, next.size, next.url]), candidates: latest.name === current.name && latest.size === current.size ? product.imageCandidates || [] : [] });
       setFeedback(product.warning || 'Link and available details added.');
     } catch {
       if (valueRef.current.url === match.url) setFeedback('Product link added. The store could not provide other details.');
@@ -67,7 +72,8 @@ function ProductEditor({ value, onChange, prefix, disabled, onUploadBusyChange, 
       <div className="field"><label htmlFor={`${prefix}-size`}>Size / color <span className="optional">(optional)</span></label><input id={`${prefix}-size`} maxLength={100} value={value.size} disabled={disabled} onChange={e=>patch({size:e.target.value})}/></div>
       <div className="field"><label htmlFor={`${prefix}-pack`}>Quantity <span className="optional">(optional)</span></label><input id={`${prefix}-pack`} type="number" min="1" max="9999" step="1" inputMode="numeric" value={value.packCount ?? ''} disabled={disabled} onChange={e=>patch({packCount:e.target.value === '' ? null : Number(e.target.value)})}/></div>
     </div>
-    <ImageInput prefix={prefix} image={value.image} name={value.name} disabled={disabled || fetching}
+    <ImageInput prefix={prefix} image={value.image} name={value.name} size={value.size} url={value.url}
+      candidates={photos?.key === JSON.stringify([value.name, value.size, value.url]) ? photos.candidates : []} disabled={disabled || fetching}
       onChange={image => patch({image, imageSource: image ? 'manual' : 'automatic'})} onBusyChange={onUploadBusyChange}/>
   </div>;
 }

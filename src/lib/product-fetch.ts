@@ -201,7 +201,7 @@ export async function readHtml(reader: ReadableStreamDefaultReader<Uint8Array>, 
   }
 }
 
-type PageReadOptions = Omit<HtmlReadOptions, 'enough'> & { enough?: (html: string, url: string) => boolean };
+type PageReadOptions = Omit<HtmlReadOptions, 'enough'> & { enough?: (html: string, url: string) => boolean; format?: 'html' | 'json' };
 
 async function fetchPage(value: string, options: PageReadOptions = {}, request: typeof fetch = fetch): Promise<{ html: string; url: string }> {
   let url = validateFetchUrl(value);
@@ -210,7 +210,7 @@ async function fetchPage(value: string, options: PageReadOptions = {}, request: 
     let response;
     try {
       response = await request(url, { dispatcher, redirect: 'manual', signal,
-        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ChristmasWishlist/1.0)', Accept: 'text/html,application/xhtml+xml' } });
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ChristmasWishlist/1.0)', Accept: options.format === 'json' ? 'application/json,text/javascript' : 'text/html,application/xhtml+xml' } });
     } catch {
       throw new Error(signal.aborted ? 'The store took too long to respond. Enter the details manually below.' : 'Couldn’t connect to this store. Enter the details manually below.');
     }
@@ -221,7 +221,9 @@ async function fetchPage(value: string, options: PageReadOptions = {}, request: 
       url = validateFetchUrl(new URL(location, url).href);
       continue;
     }
-    if (!response.ok || !/text\/html|application\/xhtml/.test(response.headers.get('content-type') || '')) {
+    const contentType = response.headers.get('content-type') || '';
+    const supported = options.format === 'json' ? /application\/(?:json|(?:x-)?javascript)|text\/(?:json|javascript)/i.test(contentType) : /text\/html|application\/xhtml/i.test(contentType);
+    if (!response.ok || !supported) {
       await response.body?.cancel();
       throw new Error([403, 429].includes(response.status) ? 'This store blocks automatic lookups. Enter the details manually below.' : 'This store could not provide product details. Enter them manually below.');
     }
@@ -234,6 +236,35 @@ async function fetchPage(value: string, options: PageReadOptions = {}, request: 
 }
 export async function fetchHtml(value: string, options: HtmlReadOptions = {}): Promise<string> {
   return (await fetchPage(value, options)).html;
+}
+
+export async function fetchJson(value: string, timeoutMs = 5000): Promise<unknown> {
+  return JSON.parse((await fetchPage(value, { format: 'json', timeoutMs })).html);
+}
+
+// Reuse the DNS guard for image checks, including redirects. HEAD normally avoids
+// downloading a photo; a ranged GET handles CDNs that don't support HEAD.
+export async function verifyProductImage(value: string, request: typeof fetch = fetch): Promise<boolean> {
+  let url: URL;
+  try { url = validateFetchUrl(value); } catch { return false; }
+  const signal = AbortSignal.timeout(3000);
+  let method = 'HEAD';
+  try {
+    for (let redirects = 0; redirects < 5; redirects++) {
+      const response = await request(url, { dispatcher, redirect: 'manual', signal, method,
+        headers: { Accept: 'image/*', ...(method === 'GET' ? { Range: 'bytes=0-0' } : {}) } });
+      await response.body?.cancel();
+      if ([405, 501].includes(response.status) && method === 'HEAD') { method = 'GET'; continue; }
+      if (response.status >= 300 && response.status < 400) {
+        const location = response.headers.get('location');
+        if (!location) return false;
+        url = validateFetchUrl(new URL(location, url).href); continue;
+      }
+      return response.ok && /^image\/(?:jpeg|png|webp|gif|avif)(?:;|$)/i.test(response.headers.get('content-type') || '')
+        && response.headers.get('content-length') !== '0';
+    }
+  } catch { /* Inaccessible images remain unavailable rather than auto-filled. */ }
+  return false;
 }
 
 export async function fetchProduct(value: string, request: typeof fetch = fetch): Promise<ProductDetails> {

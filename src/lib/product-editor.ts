@@ -14,9 +14,10 @@ export function mergeProductDetails(latest: ProductFields, started: ProductField
   // Preserve anything typed while the lookup was running. Missing fetched fields
   // replace old values too; a previous listing's price must not survive a refresh.
   const price = latest.price === started.price && !(fillOnly && latest.price !== null) ? product.price : latest.price;
+  const searchedPhotoStillMatches = !product.imageCandidates || latest.name === started.name && latest.size === started.size;
   return { ...latest,
     name: latest.name === started.name && !(fillOnly && latest.name) ? product.name : latest.name,
-    image: latest.imageSource !== 'manual' && latest.image === started.image && !(fillOnly && latest.image) ? product.image : latest.image,
+    image: searchedPhotoStillMatches && latest.imageSource !== 'manual' && latest.image === started.image && !(fillOnly && latest.image) ? product.image : latest.image,
     price, currency: 'USD',
     size: latest.size === started.size && !(fillOnly && latest.size) ? product.size : latest.size,
     packCount: latest.packCount === started.packCount && !(fillOnly && latest.packCount !== null) ? product.packCount : latest.packCount,

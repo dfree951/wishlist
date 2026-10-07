@@ -5,7 +5,7 @@ import { cachedSearchEntries, searchEntries } from './product-search';
 import { cleanProductUrl, productMeasurements } from './product-url';
 
 const host = (url: URL) => url.hostname.replace(/^www\./, '');
-function productId(url: URL): string | undefined {
+export function productId(url: URL): string | undefined {
   const path = url.pathname;
   switch (host(url)) {
     case 'walmart.com': return path.match(/^\/ip\/(?:[^/]+\/)?(\d+)\/?$/)?.[1];

@@ -40,3 +40,13 @@ test('name searches retain entered details for a first link and replace details 
   const replacement = withProductUrl(old, product.url);
   assert.equal(mergeProductDetails(replacement, replacement, product, true).price, 20.99);
 });
+
+test('a searched photo cannot overwrite a manual choice or a variant edited during lookup', () => {
+  const start = { ...old, image: '', url: product.url };
+  const searched = { ...product, imageCandidates: [] };
+  assert.equal(mergeProductDetails({ ...start, size: 'Different color' }, start, searched).image, '');
+  assert.equal(mergeProductDetails({ ...start, name: 'Different product' }, start, searched).image, '');
+  const manual = { ...start, image: 'https://example.com/chosen.jpg', imageSource: 'manual' as const };
+  assert.equal(mergeProductDetails(manual, start, searched).image, manual.image);
+  assert.equal(mergeProductDetails(start, start, searched).image, product.image);
+});

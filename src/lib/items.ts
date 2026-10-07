@@ -48,7 +48,8 @@ export function matchesRecipient(recipient: Recipient, filter: Recipient) {
 }
 export type BuyingOption = z.infer<typeof optionSchema>;
 export type Item = ItemData & { id: string; version: number; purchased?: boolean; purchasedAt?: string | null };
-export type ProductDetails = Pick<ItemData, 'name'|'url'|'image'|'price'|'currency'|'size'|'packCount'|'checkedAt'> & { warning?: string };
+export type ProductImageCandidate = { image: string; thumbnail: string; sourceUrl: string; name: string; confidence: 'exact' | 'suggested' };
+export type ProductDetails = Pick<ItemData, 'name'|'url'|'image'|'price'|'currency'|'size'|'packCount'|'checkedAt'> & { warning?: string; imageCandidates?: ProductImageCandidate[] };
 export type ProductMatch = { name: string; url: string; snippet: string; image?: string };
 export function money(price: number | null, currency = 'USD') {
   if (price === null) return 'Price not listed';
