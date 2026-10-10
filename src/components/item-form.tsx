@@ -11,7 +11,7 @@ export const emptyItem = (owner: Recipient): ItemData => ({ owner, preference: n
 function sourcingStatus(product: ProductDetails) {
   return `Photo ${product.image ? 'sourced' : 'not sourced'}. Price ${product.price !== null ? 'sourced' : 'not sourced'}.`;
 }
-function ProductEditor({ value, onChange, prefix, disabled, onUploadBusyChange, notes = '' }: { value: ProductFields; onChange: (next: ProductFields) => void; prefix: string; disabled: boolean; onUploadBusyChange: (busy: boolean) => void; notes?: string }) {
+function ProductEditor({ value, onChange, prefix, disabled, onUploadBusyChange, notes = '', autoFindPhoto = false }: { value: ProductFields; onChange: (next: ProductFields) => void; prefix: string; disabled: boolean; onUploadBusyChange: (busy: boolean) => void; notes?: string; autoFindPhoto?: boolean }) {
   const [fetching, setFetching] = useState(false);
   const [feedback, setFeedback] = useState('');
   const [photos, setPhotos] = useState<{ key: string; candidates: ProductImageCandidate[] } | null>(null);
@@ -75,13 +75,13 @@ function ProductEditor({ value, onChange, prefix, disabled, onUploadBusyChange, 
       <div className="field"><label htmlFor={`${prefix}-size`}>Size / color <span className="optional">(optional)</span></label><input id={`${prefix}-size`} maxLength={100} value={value.size} disabled={disabled} onChange={e=>patch({size:e.target.value})}/></div>
       <div className="field"><label htmlFor={`${prefix}-pack`}>Quantity <span className="optional">(optional)</span></label><input id={`${prefix}-pack`} type="number" min="1" max="9999" step="1" inputMode="numeric" value={value.packCount ?? ''} disabled={disabled} onChange={e=>patch({packCount:e.target.value === '' ? null : Number(e.target.value)})}/></div>
     </div>
-    <ImageInput prefix={prefix} image={value.image} name={value.name} size={value.size} url={value.url}
+    <ImageInput autoFind={autoFindPhoto} prefix={prefix} image={value.image} name={value.name} size={value.size} url={value.url}
       candidates={photos?.key === JSON.stringify([value.name, value.size, value.url]) ? photos.candidates : []} disabled={disabled || fetching}
       onChange={image => patch({image, imageSource: image ? 'manual' : 'automatic'})} onBusyChange={onUploadBusyChange}/>
   </div>;
 }
 
-export function ItemForm({ item, owner, onSave, onCancel }: { item?: Item; owner: Recipient; onSave: () => Promise<void>; onCancel: () => void }) {
+export function ItemForm({ item, owner, onSave, onCancel, autoFindPhoto = false }: { item?: Item; autoFindPhoto?: boolean; owner: Recipient; onSave: () => Promise<void>; onCancel: () => void }) {
   const [value, setValue] = useState<ItemData>(item || emptyItem(owner));
   const [saving, setBusy] = useState(false);
   const [uploads, setUploads] = useState(0);
@@ -103,7 +103,7 @@ export function ItemForm({ item, owner, onSave, onCancel }: { item?: Item; owner
     <div className="section-heading"><h2 id="item-form-heading">{item ? 'Edit item' : 'Add an item'}</h2><button className="icon-button" aria-label="Close item form" disabled={busy} onClick={onCancel}><X size={20}/></button></div>
     <form onSubmit={save}>
       <div className="field recipient-field"><label htmlFor="item-owner">For</label><select id="item-owner" value={value.owner} disabled={busy} onChange={e=>setValue(v=>({...v, owner:e.target.value as Recipient}))}><option>Both</option><option>Syd</option><option>Dan</option></select></div>
-      <ProductEditor onUploadBusyChange={uploadBusyChange} prefix="main" value={value} notes={value.notes} disabled={busy} onChange={next=>setValue(v=>({...v,...next}))}/>
+      <ProductEditor autoFindPhoto={autoFindPhoto} onUploadBusyChange={uploadBusyChange} prefix="main" value={value} notes={value.notes} disabled={busy} onChange={next=>setValue(v=>({...v,...next}))}/>
       <div className="field"><label htmlFor="item-preference">Preference <span className="optional">(optional)</span></label><select id="item-preference" value={value.preference || ''} disabled={busy} onChange={e=>setValue(v=>({...v, preference: e.target.value as ItemData['preference'] || null}))}><option value="">Not specified</option><option value="exact">{preferenceLabels.exact}</option><option value="alternatives">{preferenceLabels.alternatives}</option></select></div>
       <div className="field notes-field"><label htmlFor="item-notes">Notes <span className="optional">(optional)</span></label><textarea id="item-notes" rows={3} maxLength={2000} value={value.notes} disabled={busy} onChange={e=>setValue(v=>({...v, notes:e.target.value}))}/></div>
       <div className="alternatives-heading"><div><h3>Other links</h3><p className="field-help">Alternative item or alternative store</p></div>

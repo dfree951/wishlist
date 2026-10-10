@@ -7,9 +7,9 @@ import { prepareImage } from '@/lib/prepare-image';
 import { storeName, type ProductImageCandidate } from '@/lib/items';
 import { ProductImage } from './product-image';
 
-export function ImageInput({ image, name, size = '', url = '', candidates = [], prefix, disabled, onChange, onBusyChange }: {
+export function ImageInput({ image, name, size = '', url = '', candidates = [], autoFind = false, prefix, disabled, onChange, onBusyChange }: {
   image: string; name: string; prefix: string; disabled: boolean;
-  size?: string; url?: string; candidates?: ProductImageCandidate[];
+  size?: string; url?: string; candidates?: ProductImageCandidate[]; autoFind?: boolean;
   onChange: (image: string) => void; onBusyChange: (busy: boolean) => void;
 }) {
   const input = useRef<HTMLInputElement>(null);
@@ -32,6 +32,10 @@ export function ImageInput({ image, name, size = '', url = '', candidates = [], 
     } catch (error) { if (currentKey.current === started) setError(messageOf(error)); }
     finally { setSearching(false); }
   }
+  const autoStarted = useRef(false);
+  useEffect(() => {
+    if (autoFind && !autoStarted.current) { autoStarted.current = true; void search(); }
+  });
   useEffect(() => () => request.current?.abort(), []);
 
   async function upload(file: File) {
@@ -55,7 +59,7 @@ export function ImageInput({ image, name, size = '', url = '', candidates = [], 
     }
   }
 
-  return <details className="image-settings">
+  return <details className="image-settings" open={autoFind || undefined}>
     <summary>Image {image ? 'added' : '(optional)'}</summary>
     <div className="image-edit">
       <ProductImage src={image} name={name || 'Image preview'} small/>
@@ -81,7 +85,6 @@ export function ImageInput({ image, name, size = '', url = '', candidates = [], 
     </div>
     {showPhotos && <div className="image-search-results" aria-label="Matching product photos">
       <div className="section-heading"><h3>Choose a photo</h3><button type="button" className="text-button" onClick={() => setShowPhotos(false)}>Close photos</button></div>
-      <p className="field-help">Check the size and color before choosing. Your choice will be kept when fetching details again.</p>
       {searching && <p className="field-help" role="status">Searching for matching photos…</p>}
       {!searching && photos.length === 0 && <p className="field-help" role="status">{results?.key === key && results.warning || 'No matching photos found. Try Google Images or upload a photo.'}</p>}
       <div className="image-candidates">{photos.map(candidate => <div className="image-candidate" key={candidate.image}>
@@ -89,7 +92,6 @@ export function ImageInput({ image, name, size = '', url = '', candidates = [], 
           <ProductImage src={candidate.image} name={candidate.name}/><span>Use this photo</span>
         </button>
         <a href={candidate.sourceUrl} target="_blank" rel="noreferrer">{storeName(candidate.sourceUrl)}<ExternalLink size={12}/></a>
-        <span className="field-help">{candidate.confidence === 'exact' ? 'Product and variant match' : 'Check this match'}</span>
       </div>)}</div>
       <div className="image-search-actions"><button type="button" className="text-button" disabled={disabled || uploading || searching || name.trim().length < 2} onClick={() => void search()}>Search again</button>
         <a href={searchUrl} target="_blank" rel="noreferrer">Open Google Images<ExternalLink size={12}/></a></div>
