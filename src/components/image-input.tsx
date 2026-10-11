@@ -49,7 +49,7 @@ export function ImageInput({ image, name, size = '', url = '', candidates = [], 
       photoHeading.current?.focus({ preventScroll: true });
       photoHeading.current?.scrollIntoView({ block: 'start' });
     }
-  }, [showPhotos]);
+  }, [showPhotos, searching]);
 
   async function upload(file: File) {
     const controller = new AbortController();
