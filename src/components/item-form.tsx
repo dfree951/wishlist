@@ -11,7 +11,7 @@ export const emptyItem = (owner: Recipient): ItemData => ({ owner, unlimitedPurc
 function sourcingStatus(product: ProductDetails) {
   return `Photo ${product.image ? 'sourced' : 'not sourced'}. Price ${product.price !== null ? 'sourced' : 'not sourced'}.`;
 }
-function ProductEditor({ value, onChange, prefix, disabled, onUploadBusyChange, notes = '', autoFindPhoto = false, quantityExtra }: { value: ProductFields; onChange: (next: ProductFields) => void; prefix: string; disabled: boolean; onUploadBusyChange: (busy: boolean) => void; notes?: string; autoFindPhoto?: boolean; quantityExtra?: React.ReactNode }) {
+function ProductEditor({ value, onChange, prefix, disabled, onUploadBusyChange, notes = '', autoFindPhoto = false, quantityExtra, replaceMatchedName = false }: { value: ProductFields; onChange: (next: ProductFields) => void; prefix: string; disabled: boolean; onUploadBusyChange: (busy: boolean) => void; notes?: string; autoFindPhoto?: boolean; quantityExtra?: React.ReactNode; replaceMatchedName?: boolean }) {
   const [fetching, setFetching] = useState(false);
   const [feedback, setFeedback] = useState('');
   const [photos, setPhotos] = useState<{ key: string; candidates: ProductImageCandidate[] } | null>(null);
@@ -55,6 +55,7 @@ function ProductEditor({ value, onChange, prefix, disabled, onUploadBusyChange, 
       const latest = valueRef.current;
       if (latest.url !== match.url) return;
       const next = mergeProductDetails(latest, current, { ...product, name: product.name || match.name }, true);
+      if (replaceMatchedName && latest.name === current.name) next.name = product.name || match.name;
       onChange(next);
       setPhotos({ key: JSON.stringify([next.name, next.size, next.url]), candidates: latest.name === current.name && latest.size === current.size ? product.imageCandidates || [] : [] });
       setFeedback(sourcingStatus(product));
@@ -109,7 +110,7 @@ export function ItemForm({ item, owner, onSave, onCancel, autoFindPhoto = false 
       <div className="field notes-field"><label htmlFor="item-notes">Notes <span className="optional">(optional)</span></label><textarea id="item-notes" rows={3} maxLength={2000} value={value.notes} disabled={busy} onChange={e=>setValue(v=>({...v, notes:e.target.value}))}/></div>
       <div className="alternatives-heading"><div><h3>Other links</h3><p className="field-help">Alternative item or alternative store</p></div>
         <button type="button" className="text-button" disabled={busy || value.alternatives.length >= 10} onClick={()=>setValue(v=>({...v,alternatives:[...v.alternatives,{...emptyItem(v.owner),id:crypto.randomUUID(),kind:'alternative'}]}))}><Plus size={16}/>Add a link</button></div>
-      {value.alternatives.map((a,i)=><fieldset className="alternative-editor" key={a.id} disabled={busy}><legend>Link {i+1}</legend><div className="alternative-toolbar"><label htmlFor={`kind-${a.id}`}>Link type</label><select id={`kind-${a.id}`} value={a.kind} onChange={e=>alternativeChange(i,{...a,kind:e.target.value as 'same'|'alternative'})}><option value="alternative">Alternative item</option><option value="same">Alternative store</option></select><button type="button" className="icon-button" aria-label={`Remove link ${i+1}`} onClick={()=>setValue(v=>({...v,alternatives:v.alternatives.filter(x=>x.id!==a.id)}))}><X size={18}/></button></div><ProductEditor onUploadBusyChange={uploadBusyChange} prefix={`option-${a.id}`} value={a} disabled={busy} onChange={next=>alternativeChange(i,{...a,...next})}/></fieldset>)}
+      {value.alternatives.map((a,i)=><fieldset className="alternative-editor" key={a.id} disabled={busy}><legend>Link {i+1}</legend><div className="alternative-toolbar"><label htmlFor={`kind-${a.id}`}>Link type</label><select id={`kind-${a.id}`} value={a.kind} onChange={e=>alternativeChange(i,{...a,kind:e.target.value as 'same'|'alternative',name:e.target.value==='same'?value.name:a.name})}><option value="alternative">Alternative item</option><option value="same">Alternative store</option></select><button type="button" className="icon-button" aria-label={`Remove link ${i+1}`} onClick={()=>setValue(v=>({...v,alternatives:v.alternatives.filter(x=>x.id!==a.id)}))}><X size={18}/></button></div><ProductEditor replaceMatchedName={a.kind==='same'} onUploadBusyChange={uploadBusyChange} prefix={`option-${a.id}`} value={a} disabled={busy} onChange={next=>alternativeChange(i,{...a,...next})}/></fieldset>)}
       {error && <p className="error" role="alert">{error}</p>}
       <div className="form-actions"><button className="button" disabled={busy} type="submit">{uploads > 0 ? 'Uploading image…' : saving ? 'Saving…' : item ? 'Save changes' : 'Add item'}</button><button className="button secondary" disabled={busy} type="button" onClick={onCancel}>Cancel</button></div>
     </form>
