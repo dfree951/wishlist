@@ -7,7 +7,7 @@ import { ImageInput } from './image-input';
 import { ProductSearch } from './product-search';
 import { mergeProductDetails, withProductUrl, type ProductFields } from '@/lib/product-editor';
 
-export const emptyItem = (owner: Recipient): ItemData => ({ owner, preference: null, name: '', url: '', image: '', imageSource: 'automatic', price: null, currency: 'USD', size: '', packCount: null, notes: '', checkedAt: null, alternatives: [] });
+export const emptyItem = (owner: Recipient): ItemData => ({ owner, unlimitedPurchases: false, preference: null, name: '', url: '', image: '', imageSource: 'automatic', price: null, currency: 'USD', size: '', packCount: null, notes: '', checkedAt: null, alternatives: [] });
 function sourcingStatus(product: ProductDetails) {
   return `Photo ${product.image ? 'sourced' : 'not sourced'}. Price ${product.price !== null ? 'sourced' : 'not sourced'}.`;
 }
@@ -104,6 +104,7 @@ export function ItemForm({ item, owner, onSave, onCancel, autoFindPhoto = false 
     <form onSubmit={save}>
       <div className="field recipient-field"><label htmlFor="item-owner">For</label><select id="item-owner" value={value.owner} disabled={busy} onChange={e=>setValue(v=>({...v, owner:e.target.value as Recipient}))}><option>Both</option><option>Syd</option><option>Dan</option></select></div>
       <ProductEditor autoFindPhoto={autoFindPhoto} onUploadBusyChange={uploadBusyChange} prefix="main" value={value} notes={value.notes} disabled={busy} onChange={next=>setValue(v=>({...v,...next}))}/>
+      <label className="unlimited-purchases"><input type="checkbox" checked={value.unlimitedPurchases || false} disabled={busy} onChange={e=>setValue(v=>({...v, unlimitedPurchases: e.target.checked}))}/>Allow unlimited purchases</label>
       <div className="field"><label htmlFor="item-preference">Preference <span className="optional">(optional)</span></label><select id="item-preference" value={value.preference || ''} disabled={busy} onChange={e=>setValue(v=>({...v, preference: e.target.value as ItemData['preference'] || null}))}><option value="">Not specified</option><option value="exact">{preferenceLabels.exact}</option><option value="alternatives">{preferenceLabels.alternatives}</option></select></div>
       <div className="field notes-field"><label htmlFor="item-notes">Notes <span className="optional">(optional)</span></label><textarea id="item-notes" rows={3} maxLength={2000} value={value.notes} disabled={busy} onChange={e=>setValue(v=>({...v, notes:e.target.value}))}/></div>
       <div className="alternatives-heading"><div><h3>Other links</h3><p className="field-help">Alternative item or alternative store</p></div>

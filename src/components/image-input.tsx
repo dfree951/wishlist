@@ -13,6 +13,8 @@ export function ImageInput({ image, name, size = '', url = '', candidates = [], 
   onChange: (image: string) => void; onBusyChange: (busy: boolean) => void;
 }) {
   const input = useRef<HTMLInputElement>(null);
+  const photoHeading = useRef<HTMLHeadingElement>(null);
+  const seenPhotos = useRef<{ key: string; images: string[] }>({ key: '', images: [] });
   const request = useRef<AbortController | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
@@ -23,12 +25,17 @@ export function ImageInput({ image, name, size = '', url = '', candidates = [], 
   const currentKey = useRef(key); currentKey.current = key;
   const photos = results?.key === key ? results.candidates : candidates;
   const searchUrl = `https://www.google.com/search?udm=2&q=${encodeURIComponent([name, size].filter(Boolean).join(' '))}`;
-  async function search() {
+  async function search(refresh = false) {
     const started = key;
+    if (seenPhotos.current.key !== key) seenPhotos.current = { key, images: [] };
+    const exclude = refresh ? [...new Set([...seenPhotos.current.images, ...photos.map(photo => photo.image)])].slice(-60) : [];
     setSearching(true); setError(''); setShowPhotos(true);
     try {
-      const data = await api<{ candidates: ProductImageCandidate[]; warning?: string }>('/api/product/images', { method: 'POST', body: JSON.stringify({ name, size, url }) });
-      if (currentKey.current === started) setResults({ key: started, ...data });
+      const data = await api<{ candidates: ProductImageCandidate[]; warning?: string }>('/api/product/images', { method: 'POST', body: JSON.stringify({ name, size, url, refresh, exclude }) });
+      if (currentKey.current === started) {
+        seenPhotos.current.images = [...new Set([...exclude, ...data.candidates.map(photo => photo.image)])];
+        setResults({ key: started, ...data });
+      }
     } catch (error) { if (currentKey.current === started) setError(messageOf(error)); }
     finally { setSearching(false); }
   }
@@ -37,6 +44,12 @@ export function ImageInput({ image, name, size = '', url = '', candidates = [], 
     if (autoFind && !autoStarted.current) { autoStarted.current = true; void search(); }
   });
   useEffect(() => () => request.current?.abort(), []);
+  useEffect(() => {
+    if (showPhotos) {
+      photoHeading.current?.focus({ preventScroll: true });
+      photoHeading.current?.scrollIntoView({ block: 'start' });
+    }
+  }, [showPhotos]);
 
   async function upload(file: File) {
     const controller = new AbortController();
@@ -84,16 +97,16 @@ export function ImageInput({ image, name, size = '', url = '', candidates = [], 
       </div>
     </div>
     {showPhotos && <div className="image-search-results" aria-label="Matching product photos">
-      <div className="section-heading"><h3>Choose a photo</h3><button type="button" className="text-button" onClick={() => setShowPhotos(false)}>Close photos</button></div>
+      <div className="section-heading"><h3 ref={photoHeading} tabIndex={-1}>Choose a photo</h3><button type="button" className="text-button" onClick={() => setShowPhotos(false)}>Close photos</button></div>
       {searching && <p className="field-help" role="status">Searching for matching photos…</p>}
       {!searching && photos.length === 0 && <p className="field-help" role="status">{results?.key === key && results.warning || 'No matching photos found. Try Google Images or upload a photo.'}</p>}
-      <div className="image-candidates">{photos.map(candidate => <div className="image-candidate" key={candidate.image}>
+      <div className="image-candidates">{(!searching ? photos : []).map(candidate => <div className="image-candidate" key={candidate.image}>
         <button type="button" className="image-choice" disabled={disabled || uploading || searching} aria-label={`Use photo of ${candidate.name} from ${storeName(candidate.sourceUrl)}`} onClick={() => { onChange(candidate.image); setShowPhotos(false); setError(''); }}>
           <ProductImage src={candidate.image} name={candidate.name}/><span>Use this photo</span>
         </button>
         <a href={candidate.sourceUrl} target="_blank" rel="noreferrer">{storeName(candidate.sourceUrl)}<ExternalLink size={12}/></a>
       </div>)}</div>
-      <div className="image-search-actions"><button type="button" className="text-button" disabled={disabled || uploading || searching || name.trim().length < 2} onClick={() => void search()}>Search again</button>
+      <div className="image-search-actions"><button type="button" className="text-button" disabled={disabled || uploading || searching || name.trim().length < 2} onClick={() => void search(true)}>Search again</button>
         <a href={searchUrl} target="_blank" rel="noreferrer">Open Google Images<ExternalLink size={12}/></a></div>
     </div>}
   </details>;

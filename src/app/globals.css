@@ -110,3 +110,7 @@ h1{font-weight:500;font-size:2.625rem;line-height:1.12;letter-spacing:-.7px}
 }
 
 .photo-refresh{padding:0;cursor:pointer;font:inherit;text-align:inherit}.photo-refresh:disabled{cursor:default;opacity:.6}.photo-refresh:focus-visible{outline:2px solid var(--accent);outline-offset:4px}.photo-refresh-icon{position:absolute;bottom:5px;right:5px;display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;background:var(--accent);color:var(--on-accent);box-shadow:0 1px 4px oklch(20% .02 15 / .18)}
+
+.image-search-results h3{scroll-margin-top:24px}.unlimited-purchases{display:flex;align-items:center;gap:10px;font-size:14px;margin:16px 0}.unlimited-purchases input{width:18px;height:18px;accent-color:var(--accent)}
+
+.repeat-purchase-label:disabled{opacity:1;cursor:default}

@@ -5,6 +5,13 @@ import { Response, type fetch } from 'undici';
 import { parseAmazonList, amazonListUrl, amazonProductKey } from '../src/lib/amazon';
 import { itemSchema, lowestSameItem, matchesRecipient, normalizeName } from '../src/lib/items';
 
+test('unlimited purchases default off for older items and persist an explicit choice', () => {
+  const sample = { owner: 'Both', name: 'Coffee', url: 'https://example.com/coffee', price: null };
+  assert.equal(itemSchema.parse(sample).unlimitedPurchases, false);
+  assert.equal(itemSchema.parse({ ...sample, unlimitedPurchases: true }).unlimitedPurchases, true);
+  assert.equal(itemSchema.safeParse({ ...sample, unlimitedPurchases: 'true' }).success, false);
+});
+
 test('product importer reads nested JSON-LD with image, exact offer and size',()=>{
   const html=`<script type="application/ld+json">${JSON.stringify({'@graph':[{'@type':'Product',name:'  WOOL   SWEATER ',image:[{url:'/sweater.jpg'}],size:'Medium',offers:{'@type':'Offer',price:'79.95',priceCurrency:'USD'}}]})}</script>`;
   const p=parseProductHtml(html,'https://shop.example.com/sweater');

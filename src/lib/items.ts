@@ -27,6 +27,7 @@ export const optionSchema = z.object({
 });
 export const itemSchema = z.object({
   owner: z.enum(['Dan', 'Syd', 'Both']),
+  unlimitedPurchases: z.boolean().default(false),
   preference: z.enum(['exact', 'alternatives']).nullable().default(null),
   name: z.string().trim().min(1, 'Add an item name.').max(200).transform(normalizeName),
   url: webUrl,

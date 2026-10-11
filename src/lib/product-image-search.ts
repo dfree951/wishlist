@@ -4,7 +4,7 @@ import { productId, sameProductListing } from './product-lookup';
 import { cleanProductUrl } from './product-url';
 import type { ProductImageCandidate } from './items';
 
-export type ImageSearchInput = { name: string; size?: string; url?: string };
+export type ImageSearchInput = { name: string; size?: string; url?: string; refresh?: boolean; exclude?: string[] };
 export type ImageSearchResult = { candidates: ProductImageCandidate[]; image: string; warning?: string };
 type ImageEntry = { name: string; image: string; thumbnail: string; sourceUrl: string };
 type Dependencies = { html: typeof fetchHtml; json: typeof fetchJson; verify: (url: string) => Promise<boolean> };
@@ -80,7 +80,9 @@ export function rankImageCandidates(entries: ImageEntry[], input: ImageSearchInp
   const requestedColors = [...new Set(colors(`${input.name} ${input.size || ''}`))];
   const explicitSize = normalize(input.size || '').match(/\b(?:xxs|xs|s|m|l|xl|xxl|xxxl)\b/)?.[0];
   const seen = new Set<string>();
+  const excluded = new Set((input.exclude || []).map(image => productPhotoUrl(image)));
   const ranked = entries.flatMap(entry => {
+    if (excluded.has(entry.image)) return [];
     let sourcePath: string, imagePath: string;
     try { sourcePath = decodeURIComponent(new URL(entry.sourceUrl).pathname); imagePath = decodeURIComponent(new URL(entry.image).pathname); }
     catch { return []; }
@@ -128,7 +130,7 @@ export function rankImageCandidates(entries: ImageEntry[], input: ImageSearchInp
 const cache = new Map<string, { expires: number; result: ImageSearchResult }>();
 const inFlight = new Map<string, Promise<ImageSearchResult>>();
 async function runSearch(input: ImageSearchInput, dependencies: Dependencies): Promise<ImageSearchResult> {
-  let candidates: ProductImageCandidate[] = [];
+  const allEntries: ImageEntry[] = [];
   for (const query of imageQueries(input)) {
     let entries: ImageEntry[] = [];
     try {
@@ -136,25 +138,25 @@ async function runSearch(input: ImageSearchInput, dependencies: Dependencies): P
       const token = page.match(/\bvqd\s*=\s*["']([^"']+)["']/)?.[1];
       if (token && /^[\d-]+$/.test(token)) entries = parseDuckImages(await dependencies.json(`https://duckduckgo.com/i.js?l=us-en&o=json&q=${encodeURIComponent(query)}&vqd=${encodeURIComponent(token)}&f=,,,&p=1`, 5000));
     } catch { /* Continue with the second public image index. */ }
-    candidates = rankImageCandidates(entries, input);
-    if (!candidates.length) {
-      try { candidates = rankImageCandidates(parseBingImages(await dependencies.html(`https://www.bing.com/images/search?q=${encodeURIComponent(query)}`, { timeoutMs: 4000 })), input); }
+    allEntries.push(...entries);
+    {
+      try { allEntries.push(...parseBingImages(await dependencies.html(`https://www.bing.com/images/search?q=${encodeURIComponent(query)}`, { timeoutMs: 4000 }))); }
       catch { /* The manual image-search link stays available. */ }
     }
-    if (candidates.length) break;
   }
+  const candidates = rankImageCandidates(allEntries, input);
   const checked = await Promise.allSettled(candidates.map(async candidate => await dependencies.verify(candidate.image) ? candidate : null));
   const available = checked.flatMap(result => result.status === 'fulfilled' && result.value ? [result.value] : []).slice(0, 6);
   return { candidates: available, image: available.find(candidate => candidate.confidence === 'exact')?.image || '',
-    ...(!available.length ? { warning: 'No matching photos are available right now. Try Google Images or upload a photo.' } : {}) };
+    ...(!available.length ? { warning: input.exclude?.length ? 'No more matching photos found. Try Google Images or upload a photo.' : 'No matching photos are available right now. Try Google Images or upload a photo.' } : {}) };
 }
 
 export async function searchProductImages(input: ImageSearchInput, dependencies = defaults): Promise<ImageSearchResult> {
   if (input.url) validateFetchUrl(input.url);
   if (dependencies !== defaults) return runSearch(input, dependencies);
-  const key = JSON.stringify([normalize(input.name), normalize(input.size || ''), input.url ? cleanProductUrl(input.url) : '']);
+  const key = JSON.stringify([normalize(input.name), normalize(input.size || ''), input.url ? cleanProductUrl(input.url) : '', input.exclude || []]);
   const cached = cache.get(key);
-  if (cached && cached.expires > Date.now()) return cached.result;
+  if (!input.refresh && cached && cached.expires > Date.now()) return cached.result;
   const pending = inFlight.get(key);
   if (pending) return pending;
   const task = runSearch(input, dependencies).then(result => {

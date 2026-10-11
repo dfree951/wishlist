@@ -9,6 +9,36 @@ const input = { name: 'Camille 23 Oz. Long Stem Red Wine Glass', size: '23 Oz', 
 const photo = 'https://cb.scene7.com/is/image/Crate/CamilleRedWine23ozSSS21';
 const row = (image = photo, source = url) => ({ title: 'Camille 23-Oz. Long-Stem Wine Glass - Red + Reviews | Crate & Barrel', image, thumbnail: 'https://images.example.com/thumb.jpg', url: source, width: 800, height: 800 });
 
+test('search again skips previously shown assets including alternate Scene7 transforms', async () => {
+  const entries = parseDuckImages({ results: [row(photo), row(photo.replace('SSS21', 'SHS22'))] });
+  const first = rankImageCandidates(entries, input)[0];
+  const next = rankImageCandidates(entries, { ...input, exclude: [first.image] });
+  assert.equal(next.length, 1);
+  assert.notEqual(next[0].image, first.image);
+  const exhausted = await searchProductImages({ ...input, refresh: true, exclude: entries.map(entry => entry.image) }, {
+    html: async () => "vqd='123-456'", json: async () => ({ results: [row(photo)] }), verify: async () => true,
+  });
+  assert.equal(exhausted.candidates.length, 0);
+  assert.match(exhausted.warning!, /No more matching photos/);
+});
+
+test('photo searches combine both provider results even when the first has a match', async () => {
+  let bingReads = 0;
+  const other = photo.replace('SSS21', 'SHS22');
+  const result = await searchProductImages(input, {
+    html: async url => {
+      if (url.includes('bing.com')) {
+        bingReads++;
+        return `<a class="iusc" m='${JSON.stringify({ t: input.name, murl: other, purl: input.url })}'></a>`;
+      }
+      return "vqd='123-456'";
+    },
+    json: async () => ({ results: [row(photo)] }), verify: async () => true,
+  });
+  assert.ok(bingReads > 0);
+  assert.equal(result.candidates.length, 2);
+});
+
 test('matching requires product identity, capacity, color and photo filename evidence', () => {
   const entries = parseDuckImages({ results: [
     row(photo + '?$web_pdp_main_carousel_thumb_med$'), row(photo + '?$web_pdp_main_carousel_med$'),

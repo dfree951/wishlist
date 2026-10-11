@@ -22,6 +22,10 @@ try{
  r=await request(`/api/items/${item.id}`,'PUT',{data:sample,version:1},true);assert.equal(r.res.status,409);
  r=await request('/api/items');assert.equal(r.value.items.find(i=>i.id===item.id).purchased,true);assert.equal(r.value.items.find(i=>i.id===item.id).preference,'alternatives');
  r=await request(`/api/items/${item.id}/purchase`,'POST',{purchased:false});assert.equal(r.res.status,200);
+ r=await request(`/api/items/${item.id}/purchase`,'POST',{purchased:true});assert.equal(r.res.status,200);
+ r=await request(`/api/items/${item.id}`,'PUT',{data:{...sample,unlimitedPurchases:true},version:2},true);assert.equal(r.res.status,200);
+ r=await request('/api/items');const repeat=r.value.items.find(i=>i.id===item.id);assert.equal(repeat.unlimitedPurchases,true);assert.equal(repeat.purchased,false);assert.equal(repeat.purchasedAt,null);
+ r=await request(`/api/items/${item.id}/purchase`,'POST',{purchased:true});assert.equal(r.res.status,409);
  r=await request('/api/product','POST',{url:'http://127.0.0.1:3000'},true);assert.equal(r.res.status,422);
  const html=await readFile(new URL('../tests/fixtures/amazon-list.html',import.meta.url),'utf8');
  r=await request('/api/amazon','POST',{url:'https://www.amazon.com/hz/wishlist/ls/TESTIMPORT',html},true);assert.equal(r.res.status,200);assert.equal(r.value.items.length,2);

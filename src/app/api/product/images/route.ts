@@ -14,6 +14,8 @@ export async function POST(request: Request) {
       name: z.string().trim().min(2, 'Enter an item name first.').max(200),
       size: z.string().trim().max(100).default(''),
       url: z.union([webUrl, z.literal('')]).default(''),
+      refresh: z.boolean().default(false),
+      exclude: z.array(webUrl).max(60).default([]),
     }).parse(await body(request));
     if (input.url) {
       try { validateFetchUrl(input.url); }
