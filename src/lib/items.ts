@@ -49,7 +49,13 @@ export function matchesRecipient(recipient: Recipient, filter: Recipient) {
   return filter === 'Both' || recipient === 'Both' || recipient === filter;
 }
 export type BuyingOption = z.infer<typeof optionSchema>;
-export type Item = ItemData & { id: string; version: number; purchased?: boolean; purchasedAt?: string | null };
+export type Item = ItemData & { id: string; version: number; purchased?: boolean; purchasedAt?: string | null; purchasedQuantity?: number };
+export function purchaseProgress(item: Pick<Item, 'packCount' | 'purchased' | 'purchasedQuantity'>) {
+  const desired = item.packCount ?? 1;
+  const purchased = item.purchasedQuantity ?? (item.purchased ? desired : 0);
+  return { desired, purchased, remaining: Math.max(0, desired - purchased) };
+}
+export const purchaseSchema = z.object({ purchased: z.boolean(), quantity: z.number().int().min(1).max(9999).optional() });
 export type ProductImageCandidate = { image: string; thumbnail: string; sourceUrl: string; name: string; confidence: 'exact' | 'suggested' };
 export type ProductDetails = Pick<ItemData, 'name'|'url'|'image'|'price'|'currency'|'size'|'packCount'|'checkedAt'> & { warning?: string; imageCandidates?: ProductImageCandidate[] };
 export type ProductMatch = { name: string; url: string; snippet: string; image?: string };

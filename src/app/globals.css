@@ -114,3 +114,5 @@ h1{font-weight:500;font-size:2.625rem;line-height:1.12;letter-spacing:-.7px}
 .image-search-results h3{scroll-margin-top:24px}.unlimited-purchases{display:flex;align-items:center;gap:10px;font-size:14px;margin:16px 0}.unlimited-purchases input{width:18px;height:18px;accent-color:var(--accent)}
 
 .repeat-purchase-label:disabled{opacity:1;cursor:default}
+
+.quantity-purchase { grid-column: 1 / -1; width: min(100%, 28rem); margin-left: auto; }

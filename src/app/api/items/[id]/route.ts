@@ -10,8 +10,10 @@ export async function PUT(request: Request, context: Context) {
     if (!await isOwner()) throw new HttpError(401, 'Please sign in to edit the lists.');
     const id = z.string().uuid().parse((await context.params).id);
     const { data, version } = z.object({ data: itemSchema, version: z.number().int().positive() }).parse(await body(request));
-    const rows = await db()`UPDATE christmas_items SET data = ${JSON.stringify(data)}::jsonb, version = version + 1, updated_at = now(),
-      purchased = CASE WHEN ${data.unlimitedPurchases} THEN false ELSE purchased END,
+    const rows = await db()`UPDATE christmas_items SET data = ${JSON.stringify(data)}::jsonb || jsonb_build_object('_purchasedQuantity',
+        CASE WHEN ${data.unlimitedPurchases} THEN 0 ELSE COALESCE((data->>'_purchasedQuantity')::integer, CASE WHEN purchased THEN COALESCE((data->>'packCount')::integer, 1) ELSE 0 END) END),
+      version = version + 1, updated_at = now(),
+      purchased = NOT ${data.unlimitedPurchases} AND COALESCE((data->>'_purchasedQuantity')::integer, CASE WHEN purchased THEN COALESCE((data->>'packCount')::integer, 1) ELSE 0 END) >= ${data.packCount ?? 1},
       purchased_at = CASE WHEN ${data.unlimitedPurchases} THEN NULL ELSE purchased_at END
       WHERE id = ${id} AND version = ${version} RETURNING version`;
     if (!rows.length) throw new HttpError(409, 'This item changed in another window. Close this form and reopen it to see the latest details.');

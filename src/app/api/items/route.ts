@@ -9,11 +9,15 @@ export async function GET(request: Request) {
     if (new URL(request.url).searchParams.get('view') === 'manage') {
       if (!await isOwner()) throw new HttpError(401, 'Please sign in to edit the lists.');
       // Purchase fields are deliberately never selected or sent to the editing view.
-      const rows = await sql`SELECT id, data, version FROM christmas_items ORDER BY created_at DESC`;
+      const rows = await sql`SELECT id, data - '_purchasedQuantity' AS data, version FROM christmas_items ORDER BY created_at DESC`;
       return json({ items: rows.map(r => ({ ...r.data, id: r.id, version: r.version })) });
     }
     const rows = await sql`SELECT id, data, version, purchased, purchased_at FROM christmas_items ORDER BY created_at DESC`;
-    return json({ items: rows.map(r => ({ ...r.data, id: r.id, version: r.version, purchased: r.purchased, purchasedAt: r.purchased_at })) });
+    return json({ items: rows.map(r => {
+      const { _purchasedQuantity, ...data } = r.data;
+      return { ...data, id: r.id, version: r.version, purchased: r.purchased, purchasedAt: r.purchased_at,
+        purchasedQuantity: _purchasedQuantity ?? (r.purchased ? data.packCount ?? 1 : 0) };
+    }) });
   } catch (e) { return errorResponse(e); }
 }
 export async function POST(request: Request) {
