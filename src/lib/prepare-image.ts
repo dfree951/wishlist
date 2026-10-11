@@ -5,7 +5,9 @@ export async function prepareImage(file: File): Promise<Blob> {
   try {
     const image = new Image();
     image.src = url;
-    await image.decode().catch(() => { throw new Error('This image could not be opened. Choose a JPG, PNG, WebP, or GIF image.'); });
+    await image.decode().catch(() => {
+      throw new Error('This image could not be opened. Choose a JPG, PNG, WebP, or GIF image.');
+    });
     const scale = Math.min(1, 1600 / Math.max(image.naturalWidth, image.naturalHeight));
     const canvas = document.createElement('canvas');
     canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
@@ -16,9 +18,15 @@ export async function prepareImage(file: File): Promise<Blob> {
     context.fillRect(0, 0, canvas.width, canvas.height);
     context.drawImage(image, 0, 0, canvas.width, canvas.height);
     const blob = await new Promise<Blob>((resolve, reject) => {
-      canvas.toBlob(value => value ? resolve(value) : reject(new Error('Unable to prepare this image.')), 'image/jpeg', .85);
+      canvas.toBlob(
+        (value) => (value ? resolve(value) : reject(new Error('Unable to prepare this image.'))),
+        'image/jpeg',
+        0.85,
+      );
     });
     if (blob.size > 3_500_000) throw new Error('This image is too large. Choose a smaller image.');
     return blob;
-  } finally { URL.revokeObjectURL(url); }
+  } finally {
+    URL.revokeObjectURL(url);
+  }
 }

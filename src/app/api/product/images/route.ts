@@ -9,19 +9,26 @@ export const maxDuration = 35;
 export async function POST(request: Request) {
   try {
     sameOrigin(request);
-    if (!await isOwner()) throw new HttpError(401, 'Please sign in to find a photo.');
-    const input = z.object({
-      name: z.string().trim().min(2, 'Enter an item name first.').max(200),
-      size: z.string().trim().max(100).default(''),
-      url: z.union([webUrl, z.literal('')]).default(''),
-      refresh: z.boolean().default(false),
-      exclude: z.array(webUrl).max(60).default([]),
-    }).parse(await body(request));
+    if (!(await isOwner())) throw new HttpError(401, 'Please sign in to find a photo.');
+    const input = z
+      .object({
+        name: z.string().trim().min(2, 'Enter an item name first.').max(200),
+        size: z.string().trim().max(100).default(''),
+        url: z.union([webUrl, z.literal('')]).default(''),
+        refresh: z.boolean().default(false),
+        exclude: z.array(webUrl).max(60).default([]),
+      })
+      .parse(await body(request));
     if (input.url) {
-      try { validateFetchUrl(input.url); }
-      catch { throw new HttpError(400, 'Use a public product link.'); }
+      try {
+        validateFetchUrl(input.url);
+      } catch {
+        throw new HttpError(400, 'Use a public product link.');
+      }
     }
     await rateLimit(request, 'image-search', 30);
     return json(await searchProductImages(input));
-  } catch (error) { return errorResponse(error); }
+  } catch (error) {
+    return errorResponse(error);
+  }
 }

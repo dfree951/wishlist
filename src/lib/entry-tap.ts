@@ -12,6 +12,7 @@ export function movedBeyondTap(start: EntryTap, x: number, y: number) {
 }
 
 export function isEntryTap(start: EntryTap, id: number, x: number, y: number, time: number) {
-  return start.id === id && !start.moved && !movedBeyondTap(start, x, y)
-    && time - start.startedAt < 600;
+  return (
+    start.id === id && !start.moved && !movedBeyondTap(start, x, y) && time - start.startedAt < 600
+  );
 }

@@ -2,28 +2,79 @@
 import { useRef, useState } from 'react';
 import { ArrowDownToLine, Plus, X } from 'lucide-react';
 import { api, messageOf } from '@/lib/client';
-import { itemSchema, preferenceLabels, webUrl, type Item, type ItemData, type Recipient, type BuyingOption, type ProductDetails, type ProductMatch, type ProductImageCandidate } from '@/lib/items';
+import {
+  itemSchema,
+  preferenceLabels,
+  webUrl,
+  type Item,
+  type ItemData,
+  type Recipient,
+  type BuyingOption,
+  type ProductDetails,
+  type ProductMatch,
+  type ProductImageCandidate,
+} from '@/lib/items';
 import { normalizeWebsiteUrl } from '@/lib/product-url';
 import { ImageInput } from './image-input';
 import { ProductSearch } from './product-search';
 import { mergeProductDetails, withProductUrl, type ProductFields } from '@/lib/product-editor';
 
-export const emptyItem = (owner: Recipient): ItemData => ({ owner, unlimitedPurchases: false, preference: null, name: '', url: '', image: '', imageSource: 'automatic', price: null, currency: 'USD', size: '', packCount: null, notes: '', checkedAt: null, alternatives: [] });
+export const emptyItem = (owner: Recipient): ItemData => ({
+  owner,
+  unlimitedPurchases: false,
+  preference: null,
+  name: '',
+  url: '',
+  image: '',
+  imageSource: 'automatic',
+  price: null,
+  currency: 'USD',
+  size: '',
+  packCount: null,
+  notes: '',
+  checkedAt: null,
+  alternatives: [],
+});
 function sourcingStatus(product: ProductDetails) {
   return `Photo ${product.image ? 'sourced' : 'not sourced'}. Price ${product.price !== null ? 'sourced' : 'not sourced'}.`;
 }
-function ProductEditor({ value, onChange, prefix, disabled, onUploadBusyChange, notes = '', autoFindPhoto = false, quantityExtra, replaceMatchedName = false }: { value: ProductFields; onChange: (next: ProductFields) => void; prefix: string; disabled: boolean; onUploadBusyChange: (busy: boolean) => void; notes?: string; autoFindPhoto?: boolean; quantityExtra?: React.ReactNode; replaceMatchedName?: boolean }) {
+function ProductEditor({
+  value,
+  onChange,
+  prefix,
+  disabled,
+  onUploadBusyChange,
+  notes = '',
+  autoFindPhoto = false,
+  quantityExtra,
+  replaceMatchedName = false,
+}: {
+  value: ProductFields;
+  onChange: (next: ProductFields) => void;
+  prefix: string;
+  disabled: boolean;
+  onUploadBusyChange: (busy: boolean) => void;
+  notes?: string;
+  autoFindPhoto?: boolean;
+  quantityExtra?: React.ReactNode;
+  replaceMatchedName?: boolean;
+}) {
   const [fetching, setFetching] = useState(false);
   const [feedback, setFeedback] = useState('');
-  const [photos, setPhotos] = useState<{ key: string; candidates: ProductImageCandidate[] } | null>(null);
+  const [photos, setPhotos] = useState<{ key: string; candidates: ProductImageCandidate[] } | null>(
+    null,
+  );
   const lastAuto = useRef(value.url);
   const detailsUrl = useRef(value.url);
-  const valueRef = useRef(value); valueRef.current = value;
+  const valueRef = useRef(value);
+  valueRef.current = value;
   const patch = (changes: Partial<ProductFields>) => onChange({ ...valueRef.current, ...changes });
   function changeUrl(url: string) {
     const next = withProductUrl(valueRef.current, url, detailsUrl.current);
     if (detailsUrl.current.trim() !== url.trim()) detailsUrl.current = '';
-    onChange(next); setFeedback(''); setPhotos(null);
+    onChange(next);
+    setFeedback('');
+    setPhotos(null);
   }
   async function lookup(automatic = false) {
     let current = valueRef.current;
@@ -35,20 +86,41 @@ function ProductEditor({ value, onChange, prefix, disabled, onUploadBusyChange, 
       onChange(current);
     }
     if (automatic && lastAuto.current === current.url) return;
-    if (!webUrl.safeParse(current.url).success) { setFeedback('Enter a website address, such as store.com/product.'); return; }
+    if (!webUrl.safeParse(current.url).success) {
+      setFeedback('Enter a website address, such as store.com/product.');
+      return;
+    }
     lastAuto.current = current.url;
     const requestedUrl = current.url;
     detailsUrl.current = requestedUrl;
-    setFetching(true); setFeedback('');
+    setFetching(true);
+    setFeedback('');
     try {
-      const { product } = await api<{product: ProductDetails}>('/api/product', { method: 'POST', body: JSON.stringify({ url: requestedUrl, name: current.name, size: current.size, findImage: current.imageSource !== 'manual' }) });
+      const { product } = await api<{ product: ProductDetails }>('/api/product', {
+        method: 'POST',
+        body: JSON.stringify({
+          url: requestedUrl,
+          name: current.name,
+          size: current.size,
+          findImage: current.imageSource !== 'manual',
+        }),
+      });
       if (valueRef.current.url !== requestedUrl) return;
       const next = mergeProductDetails(valueRef.current, current, product);
       onChange(next);
-      setPhotos({ key: JSON.stringify([next.name, next.size, next.url]), candidates: valueRef.current.name === current.name && valueRef.current.size === current.size ? product.imageCandidates || [] : [] });
+      setPhotos({
+        key: JSON.stringify([next.name, next.size, next.url]),
+        candidates:
+          valueRef.current.name === current.name && valueRef.current.size === current.size
+            ? product.imageCandidates || []
+            : [],
+      });
       setFeedback(sourcingStatus(product));
-    } catch (e) { if (valueRef.current.url === requestedUrl) setFeedback(messageOf(e)); }
-    finally { setFetching(false); }
+    } catch (e) {
+      if (valueRef.current.url === requestedUrl) setFeedback(messageOf(e));
+    } finally {
+      setFetching(false);
+    }
   }
   async function chooseMatch(match: ProductMatch) {
     lastAuto.current = match.url;
@@ -56,70 +128,387 @@ function ProductEditor({ value, onChange, prefix, disabled, onUploadBusyChange, 
     const current = withProductUrl(valueRef.current, match.url, detailsUrl.current);
     detailsUrl.current = match.url;
     onChange(current);
-    setFetching(true); setFeedback('');
+    setFetching(true);
+    setFeedback('');
     try {
-      const { product } = await api<{ product: ProductDetails }>('/api/product', { method: 'POST', body: JSON.stringify({ url: match.url, name: match.name.slice(0, 200), size: current.size, findImage: current.imageSource !== 'manual' }) });
+      const { product } = await api<{ product: ProductDetails }>('/api/product', {
+        method: 'POST',
+        body: JSON.stringify({
+          url: match.url,
+          name: match.name.slice(0, 200),
+          size: current.size,
+          findImage: current.imageSource !== 'manual',
+        }),
+      });
       const latest = valueRef.current;
       if (latest.url !== match.url) return;
-      const next = mergeProductDetails(latest, current, { ...product, name: product.name || match.name }, true);
-      if (replaceMatchedName && latest.name === current.name) next.name = product.name || match.name;
+      const next = mergeProductDetails(
+        latest,
+        current,
+        { ...product, name: product.name || match.name },
+        true,
+      );
+      if (replaceMatchedName && latest.name === current.name)
+        next.name = product.name || match.name;
       onChange(next);
-      setPhotos({ key: JSON.stringify([next.name, next.size, next.url]), candidates: latest.name === current.name && latest.size === current.size ? product.imageCandidates || [] : [] });
+      setPhotos({
+        key: JSON.stringify([next.name, next.size, next.url]),
+        candidates:
+          latest.name === current.name && latest.size === current.size
+            ? product.imageCandidates || []
+            : [],
+      });
       setFeedback(sourcingStatus(product));
     } catch {
-      if (valueRef.current.url === match.url) setFeedback('Product link added. The store could not provide other details.');
-    } finally { setFetching(false); }
+      if (valueRef.current.url === match.url)
+        setFeedback('Product link added. The store could not provide other details.');
+    } finally {
+      setFetching(false);
+    }
   }
-  return <div className="product-fields">
-    <div className="field"><label htmlFor={`${prefix}-url`}>Product link <span className="required">*</span></label>
-      <div className="url-input"><input id={`${prefix}-url`} type="text" inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false} required maxLength={2048} value={value.url} disabled={disabled} onChange={e => changeUrl(e.target.value)} onBlur={() => void lookup(true)} />
-        <button className="button secondary" type="button" disabled={fetching || disabled || !value.url} onClick={() => void lookup()}><ArrowDownToLine size={16}/>{fetching ? 'Fetching…' : 'Fetch details'}</button></div>
+  return (
+    <div className="product-fields">
+      <div className="field">
+        <label htmlFor={`${prefix}-url`}>
+          Product link <span className="required">*</span>
+        </label>
+        <div className="url-input">
+          <input
+            id={`${prefix}-url`}
+            type="text"
+            inputMode="url"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            required
+            maxLength={2048}
+            value={value.url}
+            disabled={disabled}
+            onChange={(e) => changeUrl(e.target.value)}
+            onBlur={() => void lookup(true)}
+          />
+          <button
+            className="button secondary"
+            type="button"
+            disabled={fetching || disabled || !value.url}
+            onClick={() => void lookup()}
+          >
+            <ArrowDownToLine size={16} />
+            {fetching ? 'Fetching…' : 'Fetch details'}
+          </button>
+        </div>
+      </div>
+      {feedback && (
+        <p className="form-notice" role="status">
+          {feedback}
+        </p>
+      )}
+      <div className="field">
+        <label htmlFor={`${prefix}-name`}>
+          Item name <span className="required">*</span>
+        </label>
+        <input
+          id={`${prefix}-name`}
+          required
+          maxLength={200}
+          value={value.name}
+          disabled={disabled}
+          onChange={(e) => patch({ name: e.target.value })}
+        />
+      </div>
+      <ProductSearch
+        name={value.name}
+        size={value.size.slice(0, 100)}
+        notes={notes}
+        disabled={disabled || fetching}
+        onSelect={chooseMatch}
+      />
+      <div className="field-grid two">
+        <div className="field">
+          <label htmlFor={`${prefix}-price`}>
+            Price <span className="optional">(optional)</span>
+          </label>
+          <input
+            id={`${prefix}-price`}
+            type="number"
+            min="0"
+            max="1000000"
+            step="0.01"
+            value={value.price ?? ''}
+            disabled={disabled}
+            onChange={(e) =>
+              patch({
+                price: e.target.value === '' ? null : Number(e.target.value),
+                checkedAt: null,
+              })
+            }
+          />
+        </div>
+        <div className="field">
+          <label htmlFor={`${prefix}-size`}>
+            Size / color <span className="optional">(optional)</span>
+          </label>
+          <input
+            id={`${prefix}-size`}
+            maxLength={100}
+            value={value.size}
+            disabled={disabled}
+            onChange={(e) => patch({ size: e.target.value })}
+          />
+        </div>
+        <div className="field">
+          <label htmlFor={`${prefix}-pack`}>
+            Quantity <span className="optional">(optional)</span>
+          </label>
+          <input
+            id={`${prefix}-pack`}
+            type="number"
+            min="1"
+            max="9999"
+            step="1"
+            inputMode="numeric"
+            value={value.packCount ?? ''}
+            disabled={disabled}
+            onChange={(e) =>
+              patch({ packCount: e.target.value === '' ? null : Number(e.target.value) })
+            }
+          />
+          {quantityExtra}
+        </div>
+      </div>
+      <ImageInput
+        autoFind={autoFindPhoto}
+        prefix={prefix}
+        image={value.image}
+        name={value.name}
+        size={value.size}
+        url={value.url}
+        candidates={
+          photos?.key === JSON.stringify([value.name, value.size, value.url])
+            ? photos.candidates
+            : []
+        }
+        disabled={disabled || fetching}
+        onChange={(image) => patch({ image, imageSource: image ? 'manual' : 'automatic' })}
+        onBusyChange={onUploadBusyChange}
+      />
     </div>
-    {feedback && <p className="form-notice" role="status">{feedback}</p>}
-    <div className="field"><label htmlFor={`${prefix}-name`}>Item name <span className="required">*</span></label><input id={`${prefix}-name`} required maxLength={200} value={value.name} disabled={disabled} onChange={e=>patch({name:e.target.value})}/></div>
-    <ProductSearch name={value.name} size={value.size.slice(0,100)} notes={notes} disabled={disabled || fetching} onSelect={chooseMatch}/>
-    <div className="field-grid two">
-      <div className="field"><label htmlFor={`${prefix}-price`}>Price <span className="optional">(optional)</span></label><input id={`${prefix}-price`} type="number" min="0" max="1000000" step="0.01" value={value.price ?? ''} disabled={disabled} onChange={e=>patch({price:e.target.value === '' ? null : Number(e.target.value), checkedAt:null})}/></div>
-      <div className="field"><label htmlFor={`${prefix}-size`}>Size / color <span className="optional">(optional)</span></label><input id={`${prefix}-size`} maxLength={100} value={value.size} disabled={disabled} onChange={e=>patch({size:e.target.value})}/></div>
-      <div className="field"><label htmlFor={`${prefix}-pack`}>Quantity <span className="optional">(optional)</span></label><input id={`${prefix}-pack`} type="number" min="1" max="9999" step="1" inputMode="numeric" value={value.packCount ?? ''} disabled={disabled} onChange={e=>patch({packCount:e.target.value === '' ? null : Number(e.target.value)})}/>{quantityExtra}</div>
-    </div>
-    <ImageInput autoFind={autoFindPhoto} prefix={prefix} image={value.image} name={value.name} size={value.size} url={value.url}
-      candidates={photos?.key === JSON.stringify([value.name, value.size, value.url]) ? photos.candidates : []} disabled={disabled || fetching}
-      onChange={image => patch({image, imageSource: image ? 'manual' : 'automatic'})} onBusyChange={onUploadBusyChange}/>
-  </div>;
+  );
 }
 
-export function ItemForm({ item, owner, onSave, onCancel, autoFindPhoto = false }: { item?: Item; autoFindPhoto?: boolean; owner: Recipient; onSave: () => Promise<void>; onCancel: () => void }) {
+export function ItemForm({
+  item,
+  owner,
+  onSave,
+  onCancel,
+  autoFindPhoto = false,
+}: {
+  item?: Item;
+  autoFindPhoto?: boolean;
+  owner: Recipient;
+  onSave: () => Promise<void>;
+  onCancel: () => void;
+}) {
   const [value, setValue] = useState<ItemData>(item || emptyItem(owner));
   const [saving, setBusy] = useState(false);
   const [uploads, setUploads] = useState(0);
   const busy = saving || uploads > 0;
-  const uploadBusyChange = (uploading: boolean) => setUploads(count => Math.max(0, count + (uploading ? 1 : -1)));
+  const uploadBusyChange = (uploading: boolean) =>
+    setUploads((count) => Math.max(0, count + (uploading ? 1 : -1)));
   const [error, setError] = useState('');
   async function save(event: React.FormEvent) {
-    event.preventDefault(); if (busy) return; setError('');
+    event.preventDefault();
+    if (busy) return;
+    setError('');
     const result = itemSchema.safeParse(value);
-    if (!result.success) { setError(result.error.issues[0].message); return; }
+    if (!result.success) {
+      setError(result.error.issues[0].message);
+      return;
+    }
     setBusy(true);
     try {
-      await api(item ? `/api/items/${item.id}` : '/api/items', { method: item ? 'PUT' : 'POST', body: JSON.stringify(item ? {data:result.data,version:item.version} : result.data) });
+      await api(item ? `/api/items/${item.id}` : '/api/items', {
+        method: item ? 'PUT' : 'POST',
+        body: JSON.stringify(item ? { data: result.data, version: item.version } : result.data),
+      });
       await onSave();
-    } catch(e) { setError(messageOf(e)); setBusy(false); }
+    } catch (e) {
+      setError(messageOf(e));
+      setBusy(false);
+    }
   }
-  function alternativeChange(index: number, next: BuyingOption) { setValue(v => ({...v, alternatives:v.alternatives.map((a,i)=>i===index?next:a)})); }
-  return <section className="editor-panel" aria-labelledby="item-form-heading">
-    <div className="section-heading"><h2 id="item-form-heading">{item ? 'Edit item' : 'Add an item'}</h2><button className="icon-button" aria-label="Close item form" disabled={busy} onClick={onCancel}><X size={20}/></button></div>
-    <form onSubmit={save}>
-      <div className="field recipient-field"><label htmlFor="item-owner">For</label><select id="item-owner" value={value.owner} disabled={busy} onChange={e=>setValue(v=>({...v, owner:e.target.value as Recipient}))}><option>Both</option><option>Syd</option><option>Dan</option></select></div>
-      <ProductEditor autoFindPhoto={autoFindPhoto} onUploadBusyChange={uploadBusyChange} prefix="main" value={value} notes={value.notes} disabled={busy} onChange={next=>setValue(v=>({...v,...next}))}
-        quantityExtra={<label className="unlimited-purchases"><input type="checkbox" checked={value.unlimitedPurchases || false} disabled={busy} onChange={e=>setValue(v=>({...v, unlimitedPurchases: e.target.checked}))}/>Allow unlimited purchases</label>}/>
-      <div className="field"><label htmlFor="item-preference">Preference <span className="optional">(optional)</span></label><select id="item-preference" value={value.preference || ''} disabled={busy} onChange={e=>setValue(v=>({...v, preference: e.target.value as ItemData['preference'] || null}))}><option value="">Not specified</option><option value="exact">{preferenceLabels.exact}</option><option value="alternatives">{preferenceLabels.alternatives}</option></select></div>
-      <div className="field notes-field"><label htmlFor="item-notes">Notes <span className="optional">(optional)</span></label><textarea id="item-notes" rows={3} maxLength={2000} value={value.notes} disabled={busy} onChange={e=>setValue(v=>({...v, notes:e.target.value}))}/></div>
-      <div className="alternatives-heading"><div><h3>Other links</h3><p className="field-help">Alternative item or alternative store</p></div>
-        <button type="button" className="text-button" disabled={busy || value.alternatives.length >= 10} onClick={()=>setValue(v=>({...v,alternatives:[...v.alternatives,{...emptyItem(v.owner),id:crypto.randomUUID(),kind:'alternative'}]}))}><Plus size={16}/>Add a link</button></div>
-      {value.alternatives.map((a,i)=><fieldset className="alternative-editor" key={a.id} disabled={busy}><legend>Link {i+1}</legend><div className="alternative-toolbar"><label htmlFor={`kind-${a.id}`}>Link type</label><select id={`kind-${a.id}`} value={a.kind} onChange={e=>alternativeChange(i,{...a,kind:e.target.value as 'same'|'alternative',name:e.target.value==='same'?value.name:a.name})}><option value="alternative">Alternative item</option><option value="same">Alternative store</option></select><button type="button" className="icon-button" aria-label={`Remove link ${i+1}`} onClick={()=>setValue(v=>({...v,alternatives:v.alternatives.filter(x=>x.id!==a.id)}))}><X size={18}/></button></div><ProductEditor replaceMatchedName={a.kind==='same'} onUploadBusyChange={uploadBusyChange} prefix={`option-${a.id}`} value={a} disabled={busy} onChange={next=>alternativeChange(i,{...a,...next})}/></fieldset>)}
-      {error && <p className="error" role="alert">{error}</p>}
-      <div className="form-actions"><button className="button" disabled={busy} type="submit">{uploads > 0 ? 'Uploading image…' : saving ? 'Saving…' : item ? 'Save changes' : 'Add item'}</button><button className="button secondary" disabled={busy} type="button" onClick={onCancel}>Cancel</button></div>
-    </form>
-  </section>;
+  function alternativeChange(index: number, next: BuyingOption) {
+    setValue((v) => ({
+      ...v,
+      alternatives: v.alternatives.map((a, i) => (i === index ? next : a)),
+    }));
+  }
+  return (
+    <section className="editor-panel" aria-labelledby="item-form-heading">
+      <div className="section-heading">
+        <h2 id="item-form-heading">{item ? 'Edit item' : 'Add an item'}</h2>
+        <button
+          className="icon-button"
+          aria-label="Close item form"
+          disabled={busy}
+          onClick={onCancel}
+        >
+          <X size={20} />
+        </button>
+      </div>
+      <form onSubmit={save}>
+        <div className="field recipient-field">
+          <label htmlFor="item-owner">For</label>
+          <select
+            id="item-owner"
+            value={value.owner}
+            disabled={busy}
+            onChange={(e) => setValue((v) => ({ ...v, owner: e.target.value as Recipient }))}
+          >
+            <option>Both</option>
+            <option>Syd</option>
+            <option>Dan</option>
+          </select>
+        </div>
+        <ProductEditor
+          autoFindPhoto={autoFindPhoto}
+          onUploadBusyChange={uploadBusyChange}
+          prefix="main"
+          value={value}
+          notes={value.notes}
+          disabled={busy}
+          onChange={(next) => setValue((v) => ({ ...v, ...next }))}
+          quantityExtra={
+            <label className="unlimited-purchases">
+              <input
+                type="checkbox"
+                checked={value.unlimitedPurchases || false}
+                disabled={busy}
+                onChange={(e) => setValue((v) => ({ ...v, unlimitedPurchases: e.target.checked }))}
+              />
+              Allow unlimited purchases
+            </label>
+          }
+        />
+        <div className="field">
+          <label htmlFor="item-preference">
+            Preference <span className="optional">(optional)</span>
+          </label>
+          <select
+            id="item-preference"
+            value={value.preference || ''}
+            disabled={busy}
+            onChange={(e) =>
+              setValue((v) => ({
+                ...v,
+                preference: (e.target.value as ItemData['preference']) || null,
+              }))
+            }
+          >
+            <option value="">Not specified</option>
+            <option value="exact">{preferenceLabels.exact}</option>
+            <option value="alternatives">{preferenceLabels.alternatives}</option>
+          </select>
+        </div>
+        <div className="field notes-field">
+          <label htmlFor="item-notes">
+            Notes <span className="optional">(optional)</span>
+          </label>
+          <textarea
+            id="item-notes"
+            rows={3}
+            maxLength={2000}
+            value={value.notes}
+            disabled={busy}
+            onChange={(e) => setValue((v) => ({ ...v, notes: e.target.value }))}
+          />
+        </div>
+        <div className="alternatives-heading">
+          <div>
+            <h3>Other links</h3>
+            <p className="field-help">Alternative item or alternative store</p>
+          </div>
+          <button
+            type="button"
+            className="text-button"
+            disabled={busy || value.alternatives.length >= 10}
+            onClick={() =>
+              setValue((v) => ({
+                ...v,
+                alternatives: [
+                  ...v.alternatives,
+                  { ...emptyItem(v.owner), id: crypto.randomUUID(), kind: 'alternative' },
+                ],
+              }))
+            }
+          >
+            <Plus size={16} />
+            Add a link
+          </button>
+        </div>
+        {value.alternatives.map((a, i) => (
+          <fieldset className="alternative-editor" key={a.id} disabled={busy}>
+            <legend>Link {i + 1}</legend>
+            <div className="alternative-toolbar">
+              <label htmlFor={`kind-${a.id}`}>Link type</label>
+              <select
+                id={`kind-${a.id}`}
+                value={a.kind}
+                onChange={(e) =>
+                  alternativeChange(i, {
+                    ...a,
+                    kind: e.target.value as 'same' | 'alternative',
+                    name: e.target.value === 'same' ? value.name : a.name,
+                  })
+                }
+              >
+                <option value="alternative">Alternative item</option>
+                <option value="same">Alternative store</option>
+              </select>
+              <button
+                type="button"
+                className="icon-button"
+                aria-label={`Remove link ${i + 1}`}
+                onClick={() =>
+                  setValue((v) => ({
+                    ...v,
+                    alternatives: v.alternatives.filter((x) => x.id !== a.id),
+                  }))
+                }
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <ProductEditor
+              replaceMatchedName={a.kind === 'same'}
+              onUploadBusyChange={uploadBusyChange}
+              prefix={`option-${a.id}`}
+              value={a}
+              disabled={busy}
+              onChange={(next) => alternativeChange(i, { ...a, ...next })}
+            />
+          </fieldset>
+        ))}
+        {error && (
+          <p className="error" role="alert">
+            {error}
+          </p>
+        )}
+        <div className="form-actions">
+          <button className="button" disabled={busy} type="submit">
+            {uploads > 0
+              ? 'Uploading image…'
+              : saving
+                ? 'Saving…'
+                : item
+                  ? 'Save changes'
+                  : 'Add item'}
+          </button>
+          <button className="button secondary" disabled={busy} type="button" onClick={onCancel}>
+            Cancel
+          </button>
+        </div>
+      </form>
+    </section>
+  );
 }

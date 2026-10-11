@@ -6,7 +6,10 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   try {
     sameOrigin(request);
     await rateLimit(request, 'purchase', 120);
-    const id = z.string().uuid().parse((await context.params).id);
+    const id = z
+      .string()
+      .uuid()
+      .parse((await context.params).id);
     const { purchased, quantity } = purchaseSchema.parse(await body(request));
     const sql = db();
     // The internal count is removed from owner reads and preserved by owner edits.
@@ -26,7 +29,15 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
         WHERE id = ${id} AND COALESCE(data->>'unlimitedPurchases', 'false') <> 'true'
           AND COALESCE((data->>'_purchasedQuantity')::integer, CASE WHEN purchased THEN COALESCE((data->>'packCount')::integer, 1) ELSE 0 END) > 0
         RETURNING purchased, (data->>'_purchasedQuantity')::integer AS quantity`;
-    if (!rows.length) throw new HttpError(409, purchased ? 'Someone already marked this item purchased, or it was removed. The list has been refreshed.' : 'This item is already available, or it was removed. The list has been refreshed.');
+    if (!rows.length)
+      throw new HttpError(
+        409,
+        purchased
+          ? 'Someone already marked this item purchased, or it was removed. The list has been refreshed.'
+          : 'This item is already available, or it was removed. The list has been refreshed.',
+      );
     return json({ purchased: rows[0].purchased, purchasedQuantity: rows[0].quantity });
-  } catch (e) { return errorResponse(e); }
+  } catch (e) {
+    return errorResponse(e);
+  }
 }

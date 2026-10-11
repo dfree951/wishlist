@@ -1,6 +1,7 @@
 // Only explicit packaging counts qualify. "32 oz", "96 fluid ounces", and
 // order quantities describe something different from the number of items sold.
-const packPattern = /\b(?:(?:packs?|cases?|sets?|bundles?)\s+of\s+(\d{1,4})|(\d{1,4})\s*[-–]?\s*(?:packs?|pk))\b/i;
+const packPattern =
+  /\b(?:(?:packs?|cases?|sets?|bundles?)\s+of\s+(\d{1,4})|(\d{1,4})\s*[-–]?\s*(?:packs?|pk))\b/i;
 
 export function packCountFromText(text: string): number | null {
   const match = text.match(packPattern);
@@ -15,12 +16,19 @@ export function packQuantity(value: unknown): number | null {
 }
 
 export function isPackProperty(name: string) {
-  return /^(?:number of items|item package quantity|package quantity|pack quantity|pack size)$/i.test(name.replace(/[\u200e\u200f:]/g, '').trim());
+  return /^(?:number of items|item package quantity|package quantity|pack quantity|pack size)$/i.test(
+    name.replace(/[\u200e\u200f:]/g, '').trim(),
+  );
 }
 
 export function withoutPackSize(size: string) {
   const match = size.match(packPattern);
   if (!match) return size;
-  return size.replace(match[0], '').replace(/\(\s*\)|\[\s*\]/g, '')
-    .replace(/\s+/g, ' ').replace(/^[\s,;-]+|[\s,;-]+$/g, '').trim().replace(/^\(([^()]*)\)$/, '$1');
+  return size
+    .replace(match[0], '')
+    .replace(/\(\s*\)|\[\s*\]/g, '')
+    .replace(/\s+/g, ' ')
+    .replace(/^[\s,;-]+|[\s,;-]+$/g, '')
+    .trim()
+    .replace(/^\(([^()]*)\)$/, '$1');
 }

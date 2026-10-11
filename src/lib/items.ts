@@ -1,16 +1,35 @@
 import { z } from 'zod';
 import { normalizeWebsiteUrl, hasUnsafeUrlCharacters } from './product-url';
 
-export const webUrl = z.preprocess(value => typeof value === 'string' ? normalizeWebsiteUrl(value) : value, z.string().trim().max(2048).refine(value => !hasUnsafeUrlCharacters(value), 'Use a web link without control characters or backslashes.').url().refine(value => {
-  try {
-    const url = new URL(value);
-    return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password;
-  } catch { return false; }
-}, 'Use an http or https link without credentials.'));
+export const webUrl = z.preprocess(
+  (value) => (typeof value === 'string' ? normalizeWebsiteUrl(value) : value),
+  z
+    .string()
+    .trim()
+    .max(2048)
+    .refine(
+      (value) => !hasUnsafeUrlCharacters(value),
+      'Use a web link without control characters or backslashes.',
+    )
+    .url()
+    .refine((value) => {
+      try {
+        const url = new URL(value);
+        return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password;
+      } catch {
+        return false;
+      }
+    }, 'Use an http or https link without credentials.'),
+);
 export function normalizeName(value: string) {
   const name = value.replace(/\s+/g, ' ').trim();
   return name.length > 5 && name === name.toUpperCase() && /[A-Z]/.test(name)
-    ? name.toLowerCase().replace(/(^|\s)([a-z])/g, (_, space: string, letter: string) => space + letter.toUpperCase())
+    ? name
+        .toLowerCase()
+        .replace(
+          /(^|\s)([a-z])/g,
+          (_, space: string, letter: string) => space + letter.toUpperCase(),
+        )
     : name;
 }
 export const optionSchema = z.object({
@@ -44,30 +63,72 @@ export const itemSchema = z.object({
 });
 export type ItemData = z.infer<typeof itemSchema>;
 export type Recipient = ItemData['owner'];
-export const preferenceLabels = { exact: 'Exact item preferred', alternatives: 'Alternatives welcomed' } as const;
+export const preferenceLabels = {
+  exact: 'Exact item preferred',
+  alternatives: 'Alternatives welcomed',
+} as const;
 export function matchesRecipient(recipient: Recipient, filter: Recipient) {
   return filter === 'Both' || recipient === 'Both' || recipient === filter;
 }
 export type BuyingOption = z.infer<typeof optionSchema>;
-export type Item = ItemData & { id: string; version: number; purchased?: boolean; purchasedAt?: string | null; purchasedQuantity?: number };
-export function purchaseProgress(item: Pick<Item, 'packCount' | 'purchased' | 'purchasedQuantity'>) {
+export type Item = ItemData & {
+  id: string;
+  version: number;
+  purchased?: boolean;
+  purchasedAt?: string | null;
+  purchasedQuantity?: number;
+};
+export function purchaseProgress(
+  item: Pick<Item, 'packCount' | 'purchased' | 'purchasedQuantity'>,
+) {
   const desired = item.packCount ?? 1;
   const purchased = item.purchasedQuantity ?? (item.purchased ? desired : 0);
   return { desired, purchased, remaining: Math.max(0, desired - purchased) };
 }
-export const purchaseSchema = z.object({ purchased: z.boolean(), quantity: z.number().int().min(1).max(9999).optional() });
-export type ProductImageCandidate = { image: string; thumbnail: string; sourceUrl: string; name: string; confidence: 'exact' | 'suggested' };
-export type ProductDetails = Pick<ItemData, 'name'|'url'|'image'|'price'|'currency'|'size'|'packCount'|'checkedAt'> & { warning?: string; imageCandidates?: ProductImageCandidate[] };
+export const purchaseSchema = z.object({
+  purchased: z.boolean(),
+  quantity: z.number().int().min(1).max(9999).optional(),
+});
+export type ProductImageCandidate = {
+  image: string;
+  thumbnail: string;
+  sourceUrl: string;
+  name: string;
+  confidence: 'exact' | 'suggested';
+};
+export type ProductDetails = Pick<
+  ItemData,
+  'name' | 'url' | 'image' | 'price' | 'currency' | 'size' | 'packCount' | 'checkedAt'
+> & { warning?: string; imageCandidates?: ProductImageCandidate[] };
 export type ProductMatch = { name: string; url: string; snippet: string; image?: string };
 export function money(price: number | null, currency = 'USD') {
   if (price === null) return 'Price not listed';
-  try { return new Intl.NumberFormat('en-US', { style: 'currency', currency, maximumFractionDigits: 2 }).format(price); }
-  catch { return `${currency} ${price.toFixed(2)}`; }
+  try {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency,
+      maximumFractionDigits: 2,
+    }).format(price);
+  } catch {
+    return `${currency} ${price.toFixed(2)}`;
+  }
 }
 export function storeName(url: string) {
-  try { const host = new URL(url).hostname.replace(/^www\./, ''); return host === 'a.co' ? 'amazon.com' : host; } catch { return 'Store'; }
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, '');
+    return host === 'a.co' ? 'amazon.com' : host;
+  } catch {
+    return 'Store';
+  }
 }
 export function lowestSameItem(item: ItemData) {
-  const candidates = [{ ...item, id: 'primary', kind: 'same' as const }, ...item.alternatives.filter(a => a.kind === 'same' && (a.packCount ?? 1) === (item.packCount ?? 1))];
-  return candidates.filter(a => a.price !== null && a.currency === item.currency).sort((a,b) => a.price! - b.price!)[0];
+  const candidates = [
+    { ...item, id: 'primary', kind: 'same' as const },
+    ...item.alternatives.filter(
+      (a) => a.kind === 'same' && (a.packCount ?? 1) === (item.packCount ?? 1),
+    ),
+  ];
+  return candidates
+    .filter((a) => a.price !== null && a.currency === item.currency)
+    .sort((a, b) => a.price! - b.price!)[0];
 }

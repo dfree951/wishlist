@@ -10,7 +10,9 @@
     "typecheck": "tsc --noEmit",
     "test": "tsx --test tests/*.test.ts",
     "db:migrate": "node --env-file=.env.local scripts/migrate.mjs",
-    "test:integration": "node --env-file=.env.local scripts/integration.mjs"
+    "test:integration": "node --env-file=.env.local scripts/integration.mjs",
+    "format": "prettier --write \"src/**/*.{ts,tsx,css}\" \"scripts/*.mjs\" \"tests/*.ts\" \"*.config.ts\" package.json tsconfig.json .prettierrc.json",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\" \"scripts/*.mjs\" \"tests/*.ts\" \"*.config.ts\" package.json tsconfig.json .prettierrc.json"
   },
   "dependencies": {
     "@neondatabase/serverless": "latest",
@@ -29,6 +31,7 @@
     "@types/node": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
+    "prettier": "3.6.2",
     "tsx": "latest",
     "typescript": "latest"
   }
