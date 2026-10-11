@@ -1,12 +1,25 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { cleanProductUrl, productMeasurements } from '../src/lib/product-url';
+import { cleanProductUrl, productMeasurements, normalizeWebsiteUrl } from '../src/lib/product-url';
+import { itemSchema, webUrl } from '../src/lib/items';
 import { indexedDetails, lookupProduct, sameProductListing } from '../src/lib/product-lookup';
 import { parseProductHtml } from '../src/lib/product-fetch';
 
 const clean='https://www.crateandbarrel.com/hip-31-oz.-large-red-wine-glass/s477338';
 const tracked=clean+'?a=1552&pla_sku=477338&pcat=HSW&ag=adult&storeid=&targetid=pla-471718177139&campaignid=23702905888&adgroupid=203250578150&adpos=&creative=821520722060&device=m&matchtype=&network=g&gclsrc=aw.ds&gad_source=1&gad_campaignid=23702905888&gbraid=example&gclid=example';
 const result={name:'Hip Oversized Big Red Wine Glass + Reviews | Crate & Barrel',url:clean,snippet:'Shop the Hip wine glass.'};
+
+test('recognizable bare website addresses gain HTTPS without requiring www', () => {
+  for (const [entered, expected] of [
+    ['google.com', 'https://google.com/'], [' www.example.co.uk/item?color=red#photo ', 'https://www.example.co.uk/item?color=red#photo'],
+    ['a.co/d/123', 'https://a.co/d/123'], ['//example.org/item', 'https://example.org/item'],
+    ['http://example.com/item', 'http://example.com/item'],
+  ]) { assert.equal(normalizeWebsiteUrl(entered), expected); assert.equal(webUrl.parse(entered), expected); }
+  for (const entered of ['a wine glass', 'google', 'example.com is nice', 'javascript:alert(1)', 'ftp://example.com/item', 'user@example.com']) assert.equal(webUrl.safeParse(entered).success, false);
+  const item = itemSchema.parse({ owner: 'Both', name: 'Glass', price: null, url: 'example.com/item', alternatives: [{ id: '00000000-0000-4000-8000-000000000001', kind: 'same', name: 'Glass', price: null, url: 'other.example.org/item' }] });
+  assert.equal(item.url, 'https://example.com/item');
+  assert.equal(item.alternatives[0].url, 'https://other.example.org/item');
+});
 
 test('Crate advertising links match the same product without losing meaningful options',()=>{
   assert.equal(cleanProductUrl(clean+'?st=Camille%2023-Oz.&color=red'),clean+'?color=red');

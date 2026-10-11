@@ -1,11 +1,12 @@
 import { z } from 'zod';
+import { normalizeWebsiteUrl } from './product-url';
 
-export const webUrl = z.string().trim().max(2048).url().refine(value => {
+export const webUrl = z.preprocess(value => typeof value === 'string' ? normalizeWebsiteUrl(value) : value, z.string().trim().max(2048).url().refine(value => {
   try {
     const url = new URL(value);
     return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password;
   } catch { return false; }
-}, 'Use an http or https link without credentials.');
+}, 'Use an http or https link without credentials.'));
 export function normalizeName(value: string) {
   const name = value.replace(/\s+/g, ' ').trim();
   return name.length > 5 && name === name.toUpperCase() && /[A-Z]/.test(name)

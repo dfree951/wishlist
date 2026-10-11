@@ -2,7 +2,8 @@
 import { useRef, useState } from 'react';
 import { ArrowDownToLine, Plus, X } from 'lucide-react';
 import { api, messageOf } from '@/lib/client';
-import { itemSchema, preferenceLabels, type Item, type ItemData, type Recipient, type BuyingOption, type ProductDetails, type ProductMatch, type ProductImageCandidate } from '@/lib/items';
+import { itemSchema, preferenceLabels, webUrl, type Item, type ItemData, type Recipient, type BuyingOption, type ProductDetails, type ProductMatch, type ProductImageCandidate } from '@/lib/items';
+import { normalizeWebsiteUrl } from '@/lib/product-url';
 import { ImageInput } from './image-input';
 import { ProductSearch } from './product-search';
 import { mergeProductDetails, withProductUrl, type ProductFields } from '@/lib/product-editor';
@@ -25,10 +26,16 @@ function ProductEditor({ value, onChange, prefix, disabled, onUploadBusyChange, 
     onChange(next); setFeedback(''); setPhotos(null);
   }
   async function lookup(automatic = false) {
-    const current = valueRef.current;
+    let current = valueRef.current;
     if (!current.url.trim() || fetching || disabled) return;
+    const normalized = normalizeWebsiteUrl(current.url);
+    if (normalized !== current.url) {
+      current = withProductUrl(current, normalized, detailsUrl.current);
+      valueRef.current = current;
+      onChange(current);
+    }
     if (automatic && lastAuto.current === current.url) return;
-    try { new URL(current.url); } catch { return; }
+    if (!webUrl.safeParse(current.url).success) { setFeedback('Enter a website address, such as store.com/product.'); return; }
     lastAuto.current = current.url;
     const requestedUrl = current.url;
     detailsUrl.current = requestedUrl;
@@ -65,7 +72,7 @@ function ProductEditor({ value, onChange, prefix, disabled, onUploadBusyChange, 
   }
   return <div className="product-fields">
     <div className="field"><label htmlFor={`${prefix}-url`}>Product link <span className="required">*</span></label>
-      <div className="url-input"><input id={`${prefix}-url`} type="url" required maxLength={2048} value={value.url} disabled={disabled} onChange={e => changeUrl(e.target.value)} onBlur={() => void lookup(true)} />
+      <div className="url-input"><input id={`${prefix}-url`} type="text" inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false} required maxLength={2048} value={value.url} disabled={disabled} onChange={e => changeUrl(e.target.value)} onBlur={() => void lookup(true)} />
         <button className="button secondary" type="button" disabled={fetching || disabled || !value.url} onClick={() => void lookup()}><ArrowDownToLine size={16}/>{fetching ? 'Fetching…' : 'Fetch details'}</button></div>
     </div>
     {feedback && <p className="form-notice" role="status">{feedback}</p>}
