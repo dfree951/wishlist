@@ -20,16 +20,16 @@ function Login({ onLogin }: { onLogin:()=>void }) {
 function ItemRow({ item, manage, busy, showOwner, purchasedView=false, onPurchase, onEdit, onPhoto, onDelete }: { item:Item;manage:boolean;showOwner:boolean;busy:boolean;purchasedView?:boolean;onPurchase:(item:Item,value:boolean,quantity?:number)=>void;onEdit:(item:Item)=>void;onPhoto:(item:Item)=>void;onDelete:(item:Item)=>void }) {
   const [confirmDelete,setConfirmDelete]=useState(false);
   const [purchasePrompt,setPurchasePrompt]=useState(false);
-  const [quantity,setQuantity]=useState('1');
+  const [quantity,setQuantity]=useState('');
   const progress=purchaseProgress(item);
   function markPurchased() {
     if(item.unlimitedPurchases)return;
-    if(item.packCount!=null){setQuantity('1');setPurchasePrompt(true);}
+    if(item.packCount!=null){setQuantity('');setPurchasePrompt(true);}
     else onPurchase(item,true);
   }
   function confirmPurchase(event:React.FormEvent) {
     event.preventDefault();
-    const count=Number(quantity);
+    const count=quantity.trim()===''?1:Number(quantity);
     if(!Number.isInteger(count)||count<1||count>9999)return;
     onPurchase(item,true,count);setPurchasePrompt(false);
   }
@@ -46,7 +46,7 @@ function ItemRow({ item, manage, busy, showOwner, purchasedView=false, onPurchas
       {item.alternatives.length>0&&<details className="buying-options"><summary>{item.alternatives.length} other {item.alternatives.length===1?'link':'links'}<ChevronDown size={15}/></summary><div className="option-list">{item.alternatives.map(option=><div className="option-row" key={option.id}><ProductImage small src={option.image} name={option.name}/><div><span className="option-kind">{option.kind==='same'?'Alternative store':'Alternative item'}</span><a href={option.url} target="_blank" rel="noreferrer">{option.name}<ExternalLink size={12}/></a><p>{money(option.price,option.currency)}{option.size?` · ${option.size}`:''}</p><span className="field-help">{storeName(option.url)}</span></div></div>)}</div></details>}
     </div>
     <div className="item-actions">{manage?<><button className="button secondary" disabled={busy} onClick={()=>onEdit(item)}>Edit item</button>{confirmDelete?<div className="delete-confirm"><span>Remove this item?</span><button className="text-button danger" disabled={busy} onClick={()=>onDelete(item)}>Remove</button><button className="text-button" disabled={busy} onClick={()=>setConfirmDelete(false)}>Keep item</button></div>:<button className="text-button muted" disabled={busy} onClick={()=>setConfirmDelete(true)}>Remove</button>}</>:purchasedView?<><span className="purchased-label"><Check size={16}/>Purchased</span><button className="text-button muted" disabled={busy} onClick={()=>onPurchase(item,false)}>Mark not purchased</button></>:<><a className="button secondary" href={href} target="_blank" rel="noreferrer">View item<ExternalLink size={14}/></a><button className={`button${item.unlimitedPurchases ? " repeat-purchase-label" : ""}`} disabled={busy||item.unlimitedPurchases} onClick={markPurchased}>{item.unlimitedPurchases ? <>More always welcome</> : <><Check size={16}/>Mark purchased</>}</button><a className="comparison-link" href={`https://www.google.com/search?tbm=shop&q=${encodeURIComponent([item.name,item.size].filter(Boolean).join(' '))}`} target="_blank" rel="noreferrer">Compare prices<ExternalLink size={11}/></a></>}</div>
-    {purchasePrompt&&<form className="quantity-purchase" onSubmit={confirmPurchase}><div className="field"><label htmlFor={`purchase-quantity-${item.id}`}>Quantity purchased</label><input id={`purchase-quantity-${item.id}`} type="number" inputMode="numeric" min="1" max="9999" step="1" required autoFocus value={quantity} disabled={busy} onChange={event=>setQuantity(event.target.value)}/></div><div className="form-actions"><button className="button" disabled={busy}>Confirm purchase</button><button type="button" className="text-button" disabled={busy} onClick={()=>setPurchasePrompt(false)}>Cancel</button></div></form>}
+    {purchasePrompt&&<form className="quantity-purchase" onSubmit={confirmPurchase}><div className="field"><label htmlFor={`purchase-quantity-${item.id}`}>Quantity purchased</label><input id={`purchase-quantity-${item.id}`} type="number" inputMode="numeric" min="1" max="9999" step="1" autoFocus value={quantity} disabled={busy} onChange={event=>setQuantity(event.target.value)}/></div><div className="form-actions"><button className="button" disabled={busy}>Confirm purchase</button><button type="button" className="text-button" disabled={busy} onClick={()=>setPurchasePrompt(false)}>Cancel</button></div></form>}
   </article>;
 }
 
