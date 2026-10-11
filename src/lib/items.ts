@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { normalizeWebsiteUrl } from './product-url';
+import { normalizeWebsiteUrl, hasUnsafeUrlCharacters } from './product-url';
 
-export const webUrl = z.preprocess(value => typeof value === 'string' ? normalizeWebsiteUrl(value) : value, z.string().trim().max(2048).url().refine(value => {
+export const webUrl = z.preprocess(value => typeof value === 'string' ? normalizeWebsiteUrl(value) : value, z.string().trim().max(2048).refine(value => !hasUnsafeUrlCharacters(value), 'Use a web link without control characters or backslashes.').url().refine(value => {
   try {
     const url = new URL(value);
     return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password;

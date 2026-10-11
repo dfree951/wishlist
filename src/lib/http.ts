@@ -16,9 +16,23 @@ export function errorResponse(error: unknown) {
   return json({ error: 'Unable to save or load the list. Please try again.' }, 503);
 }
 export async function body(request: Request) {
-  const raw = await request.text();
-  if (raw.length > 50000) throw new HttpError(413, 'This request is too large.');
-  return JSON.parse(raw);
+  const reader = request.body?.getReader();
+  if (!reader) throw new SyntaxError('Invalid request.');
+  const decoder = new TextDecoder();
+  let raw = '', bytes = 0;
+  try {
+    while (true) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      bytes += chunk.value.byteLength;
+      if (bytes > 50000) {
+        await reader.cancel();
+        throw new HttpError(413, 'This request is too large.');
+      }
+      raw += decoder.decode(chunk.value, { stream: true });
+    }
+    return JSON.parse(raw + decoder.decode());
+  } finally { reader.releaseLock(); }
 }
 export function sameOrigin(request: Request) {
   if (!allowedOrigin(request)) throw new HttpError(403, 'Please use this app to make changes.');

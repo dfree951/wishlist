@@ -6,7 +6,7 @@ import { load } from 'cheerio';
 import { normalizeName, type ProductDetails, webUrl } from './items';
 import { isPackProperty, packCountFromText, packQuantity, withoutPackSize } from './product-pack';
 import { structuredProduct } from './structured-product';
-import { cleanProductUrl, productMeasurements } from './product-url';
+import { cleanProductUrl, productMeasurements, hasUnsafeUrlCharacters } from './product-url';
 
 export function publicAddress(address: string) {
   try { return ipaddr.process(address.replace(/^\[|\]$/g, '')).range() === 'unicast'; }
@@ -39,7 +39,7 @@ export function safeImage(value: unknown, base: string): string {
     return '';
   }
   if (value && typeof value === 'object') return safeImage((value as Record<string, unknown>).url || (value as Record<string, unknown>).contentUrl, base);
-  if (typeof value !== 'string' || !value.trim()) return '';
+  if (typeof value !== 'string' || !value.trim() || hasUnsafeUrlCharacters(value)) return '';
   try { return validateFetchUrl(new URL(value, base).href).href; } catch { return ''; }
 }
 export function parsePrice(value: unknown): number | null {
